@@ -39,3 +39,15 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Службові файли — у репозиторій не потрапляють.
+# Іванка переносить їх між компʼютерами вручну.
+/projectsText/
+/.agents/
+/.claude/
+
+# Текстові файли з описом проєкту — теж не комітяться,
+# зокрема й ті, які згенерував не Клод.
+/CLAUDE.md
+/AGENTS.md
+/README.md
