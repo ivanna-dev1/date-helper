@@ -8,17 +8,17 @@ const nunito = Nunito({
 });
 
 export const metadata: Metadata = {
-  title: "Date Helper — запроси на побачення",
+  title: "Date Helper — ask someone out, the easy way",
   description:
-    "Створи запрошення з варіантами часу і місця, скинь посилання — і домовтесь без зайвого листування.",
+    "Pick a few times and places, add a note, and share one link. They choose what works — no back-and-forth.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="uk" className={`${nunito.variable} h-full antialiased`}>
+    <html lang="en" className={`${nunito.variable} h-full antialiased`}>
       <body className="min-h-full font-sans">
-        {/* Продукт відкривають з телефона, тому вміст завжди вузький
-            і по центру — навіть на великому екрані. */}
+        {/* People open this on a phone, so the content is always
+            narrow and centered — even on a big screen. */}
         <div className="mx-auto flex min-h-dvh w-full max-w-[420px] flex-col px-5">
           {children}
         </div>

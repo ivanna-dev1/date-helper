@@ -3,12 +3,12 @@ export default function Home() {
     <main className="flex flex-1 flex-col items-center justify-center gap-8 py-16 text-center">
       <div className="flex flex-col gap-3">
         <h1 className="text-3xl font-bold leading-tight text-ink">
-          Покликати на побачення —<br />
-          без зайвого листування
+          Ask someone out —<br />
+          without the back-and-forth
         </h1>
         <p className="text-base leading-relaxed text-muted">
-          Обери кілька варіантів часу і місця, додай кілька слів — і скинь
-          посилання. Друга людина просто обере, що їй підходить.
+          Pick a few times and places, add a note, and share the link. They just
+          choose what works for them.
         </p>
       </div>
 
@@ -16,10 +16,10 @@ export default function Home() {
         type="button"
         className="w-full rounded-2xl bg-brand py-4 text-base font-semibold text-white"
       >
-        Створити запрошення
+        Create an invitation
       </button>
 
-      <p className="text-xs text-quiet">Без реєстрації — потрібне лише посилання</p>
+      <p className="text-xs text-quiet">No sign-up — all you need is a link</p>
     </main>
   );
 }

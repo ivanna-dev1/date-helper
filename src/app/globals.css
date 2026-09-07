@@ -1,16 +1,16 @@
 @import "tailwindcss";
 
-/* Палітра з макета (projectsText/mockups/screens.html).
-   Змінюємо кольори тільки тут — далі всюди користуємось назвами. */
+/* Colors from the mockup (projectsText/mockups/screens.html).
+   Change a color here only — everywhere else we use the names. */
 @theme {
-  --color-bg: #f8f5f2; /* фон сторінки, тепле бежеве */
-  --color-surface: #fffbf8; /* фон карток і полів */
-  --color-brand: #e8b4c8; /* основний рожевий */
-  --color-accent: #d4847c; /* персиковий акцент */
-  --color-ink: #2c2c2c; /* основний текст */
-  --color-muted: #8a8a8a; /* другорядний текст */
-  --color-quiet: #b0b0b0; /* найтихіші елементи */
-  --color-line: #e0d5ce; /* рамки */
+  --color-bg: #f8f5f2; /* page background, warm beige */
+  --color-surface: #fffbf8; /* cards and input fields */
+  --color-brand: #e8b4c8; /* main pink */
+  --color-accent: #d4847c; /* peach accent */
+  --color-ink: #2c2c2c; /* main text */
+  --color-muted: #8a8a8a; /* less important text */
+  --color-quiet: #b0b0b0; /* the quietest things */
+  --color-line: #e0d5ce; /* borders */
 }
 
 @theme inline {
