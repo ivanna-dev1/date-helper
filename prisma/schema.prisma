@@ -1,0 +1,119 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// What kind of date it is. It changes how the invitation card looks.
+enum DateFormat {
+  COFFEE
+  WALK
+  DINNER
+  MOVIE
+  SURPRISE
+}
+
+// Optional. The author can leave it empty.
+enum WhoPays {
+  MY_TREAT
+  SPLIT
+  DECIDE_LATER
+}
+
+// Where the invitation is in its life.
+enum InviteStatus {
+  PENDING // sent, still waiting for an answer
+  CONFIRMED // they picked a time and a place
+  DECLINED // they said no
+  COUNTER // they suggested something else
+  CANCELLED // the author cancelled it
+}
+
+// What the invited person answered.
+enum ResponseType {
+  YES
+  NO
+  COUNTER
+}
+
+model Invite {
+  id Int @id @default(autoincrement())
+
+  // Three different links to the same invite. Each one shows a different page,
+  // so knowing one link must not give access to the others.
+  publicToken String @unique // the invited person opens this one
+  secretToken String @unique // the author manages the invite here
+  friendToken String @unique // read-only page for "let a friend know"
+
+  authorName String
+  message    String
+  format     DateFormat
+  whoPays    WhoPays? // null means the author did not choose
+
+  status    InviteStatus @default(PENDING)
+  expiresAt DateTime
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  timeOptions  TimeOption[]
+  placeOptions PlaceOption[]
+  response     Response? // one invite gets at most one answer
+}
+
+model TimeOption {
+  id Int @id @default(autoincrement())
+
+  inviteId Int
+  invite   Invite @relation(fields: [inviteId], references: [id], onDelete: Cascade)
+
+  startsAt DateTime
+
+  // Set when the invited person picks this option.
+  chosenBy Response?
+
+  @@index([inviteId])
+}
+
+model PlaceOption {
+  id Int @id @default(autoincrement())
+
+  inviteId Int
+  invite   Invite @relation(fields: [inviteId], references: [id], onDelete: Cascade)
+
+  name String
+  note String? // for example "by the entrance"
+
+  chosenBy Response?
+
+  @@index([inviteId])
+}
+
+model Response {
+  id Int @id @default(autoincrement())
+
+  // @unique makes this one-to-one: an invite can have only one response.
+  inviteId Int    @unique
+  invite   Invite @relation(fields: [inviteId], references: [id], onDelete: Cascade)
+
+  type           ResponseType
+  respondentName String
+  message        String?
+
+  // Filled when type is YES.
+  chosenTimeId  Int?         @unique
+  chosenTime    TimeOption?  @relation(fields: [chosenTimeId], references: [id])
+  chosenPlaceId Int?         @unique
+  chosenPlace   PlaceOption? @relation(fields: [chosenPlaceId], references: [id])
+
+  // Filled when type is COUNTER. The person can change the time, the place, or both.
+  proposedTime  DateTime?
+  proposedPlace String?
+
+  createdAt DateTime @default(now())
+}

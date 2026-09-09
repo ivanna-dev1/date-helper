@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function Home() {
   return (
     <main className="flex flex-1 flex-col items-center justify-center gap-8 py-16 text-center">
@@ -12,12 +14,12 @@ export default function Home() {
         </p>
       </div>
 
-      <button
-        type="button"
-        className="w-full rounded-2xl bg-brand py-4 text-base font-semibold text-white"
+      <Link
+        href="/create"
+        className="w-full rounded-2xl bg-brand py-4 text-center text-base font-semibold text-white"
       >
         Create an invitation
-      </button>
+      </Link>
 
       <p className="text-xs text-quiet">No sign-up — all you need is a link</p>
     </main>
