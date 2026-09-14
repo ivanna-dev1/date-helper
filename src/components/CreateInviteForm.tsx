@@ -15,16 +15,7 @@ import {
   PLACE_NOTE_MAX_LENGTH,
   type InviteErrors,
 } from "@/lib/inviteRules";
-
-// Labels for the date formats. The values come from the database enum,
-// so a typo here would be a TypeScript error.
-const FORMAT_OPTIONS = [
-  { value: DateFormat.COFFEE, label: "Coffee" },
-  { value: DateFormat.WALK, label: "Walk" },
-  { value: DateFormat.DINNER, label: "Dinner" },
-  { value: DateFormat.MOVIE, label: "Movie" },
-  { value: DateFormat.SURPRISE, label: "Surprise" },
-];
+import { DATE_FORMATS, FORMAT_ORDER } from "@/lib/dateFormats";
 
 // Ready-made lines, so the author does not stare at an empty field.
 // They depend on the format: a movie hint next to "Coffee" would feel wrong.
@@ -121,8 +112,6 @@ export function CreateInviteForm() {
 
   const [isSaving, setIsSaving] = useState(false);
   const [errors, setErrors] = useState<InviteErrors>({});
-  // Temporary: shows the result until we build the author page (step 3.12).
-  const [createdToken, setCreatedToken] = useState<string | null>(null);
 
   // Without preventDefault the browser does its old default: it reloads the
   // page and puts the form fields into the address bar. Private data must
@@ -139,17 +128,22 @@ export function CreateInviteForm() {
         format,
         whoPays,
         expiryDays,
-        times: times.items.map((time) => time.value),
+        // Turn local time into UTC here, in the browser. Only the browser
+        // knows the author's time zone. The server may run in another one.
+        times: times.items.map((time) => {
+          const date = new Date(time.value);
+          // An empty or broken value goes as it is. The server will say what is wrong.
+          return Number.isNaN(date.getTime()) ? time.value : date.toISOString();
+        }),
         places: places.items.map((place) => ({
           name: place.name,
           note: place.note,
         })),
       });
 
-      // TypeScript knows which fields exist only after we check `ok`.
-      if (result.ok) {
-        setCreatedToken(result.secretToken);
-      } else {
+      // On success the server redirects to the author page, so we get a
+      // result only when something is wrong.
+      if (result) {
         setErrors(result.errors);
       }
     } finally {
@@ -179,14 +173,14 @@ export function CreateInviteForm() {
       <fieldset className="flex flex-col border-0 p-0">
         <legend className={labelStyle}>What are you inviting to?</legend>
         <div className="flex flex-wrap gap-2">
-          {FORMAT_OPTIONS.map((option) => {
-            const isActive = option.value === format;
+          {FORMAT_ORDER.map((value) => {
+            const isActive = value === format;
 
             return (
               <button
-                key={option.value}
+                key={value}
                 type="button"
-                onClick={() => setFormat(option.value)}
+                onClick={() => setFormat(value)}
                 aria-pressed={isActive}
                 className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
                   isActive
@@ -194,7 +188,7 @@ export function CreateInviteForm() {
                     : "border-line bg-surface text-muted"
                 }`}
               >
-                {option.label}
+                {DATE_FORMATS[value].label}
               </button>
             );
           })}
@@ -393,13 +387,6 @@ export function CreateInviteForm() {
       >
         {isSaving ? "Saving…" : "Create invitation"}
       </button>
-
-      {/* Temporary block. The author page replaces it in step 3.12. */}
-      {createdToken && (
-        <p className="rounded-xl border border-line bg-surface p-3 text-sm text-ink">
-          Saved. Your link: <code className="text-accent">/manage/{createdToken}</code>
-        </p>
-      )}
     </form>
   );
 }

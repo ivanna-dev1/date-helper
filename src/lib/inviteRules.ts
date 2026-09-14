@@ -19,7 +19,7 @@ export type CreateInviteInput = {
   format: DateFormat;
   whoPays: WhoPays | null;
   expiryDays: number;
-  times: string[]; // "2026-09-12T18:00"
+  times: string[]; // UTC with a zone, for example "2026-09-12T15:00:00.000Z"
   places: { name: string; note: string }[];
 };
 
@@ -62,12 +62,21 @@ export function validateInvite(input: CreateInviteInput): InviteErrors {
     errors.expiryDays = "Pick how long the link stays alive";
   }
 
+  // A time must end with its zone: "...Z" or "...+02:00".
+  // Without a zone the server would read it in its own zone and could be
+  // hours off. Our form always sends a zone; a direct request might not.
+  const hasTimeZone = /(Z|[+-]\d{2}:\d{2})$/;
+
   const times = input.times.filter((time) => time !== "");
   if (times.length === 0) {
     errors.times = "Add at least one time";
   } else if (times.length > MAX_TIME_OPTIONS) {
     errors.times = `No more than ${MAX_TIME_OPTIONS} options`;
-  } else if (times.some((time) => Number.isNaN(new Date(time).getTime()))) {
+  } else if (
+    times.some(
+      (time) => !hasTimeZone.test(time) || Number.isNaN(new Date(time).getTime()),
+    )
+  ) {
     errors.times = "One of the times is not a real date";
   } else if (times.some((time) => new Date(time) < new Date())) {
     errors.times = "A date cannot be in the past";

@@ -1,5 +1,6 @@
 "use server";
 
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { createToken } from "@/lib/tokens";
 import {
@@ -8,11 +9,9 @@ import {
   type InviteErrors,
 } from "@/lib/inviteRules";
 
-// Two shapes of answer, and TypeScript makes us check `ok` before we read
-// the rest. So we cannot use `secretToken` by mistake when it is not there.
-export type CreateInviteResult =
-  | { ok: true; secretToken: string }
-  | { ok: false; errors: InviteErrors };
+// We return something only when the data is wrong.
+// When everything is fine, the action redirects and never returns.
+export type CreateInviteResult = { errors: InviteErrors };
 
 export async function createInvite(
   input: CreateInviteInput,
@@ -20,7 +19,7 @@ export async function createInvite(
   const errors = validateInvite(input);
 
   if (Object.keys(errors).length > 0) {
-    return { ok: false, errors };
+    return { errors };
   }
 
   const expiresAt = new Date();
@@ -42,6 +41,8 @@ export async function createInvite(
       whoPays: input.whoPays,
       expiresAt,
       timeOptions: {
+        // Times come as UTC strings with a zone ("...Z"), so new Date()
+        // gives the same moment on any server, in any time zone.
         create: times.map((time) => ({ startsAt: new Date(time) })),
       },
       placeOptions: {
@@ -53,5 +54,7 @@ export async function createInvite(
     },
   });
 
-  return { ok: true, secretToken: invite.secretToken };
+  // redirect() throws a special error that Next.js catches.
+  // Code after this line never runs.
+  redirect(`/manage/${invite.secretToken}`);
 }
