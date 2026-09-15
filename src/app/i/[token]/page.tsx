@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { InviteChoices } from "@/components/InviteChoices";
+import { InviteResponseForm } from "@/components/InviteResponseForm";
 import { DATE_FORMATS } from "@/lib/dateFormats";
 
 export const metadata: Metadata = {
@@ -24,6 +24,7 @@ export default async function InvitePage(props: PageProps<"/i/[token]">) {
       authorName: true,
       message: true,
       format: true,
+      expiresAt: true,
       timeOptions: {
         select: { id: true, startsAt: true },
         orderBy: { startsAt: "asc" },
@@ -37,6 +38,24 @@ export default async function InvitePage(props: PageProps<"/i/[token]">) {
 
   if (!invite) {
     notFound();
+  }
+
+  // The link is real, so "not found" would be a lie and would look like a
+  // broken link. We say the truth: the time for this invitation is over.
+  // Comparing two moments is safe on the server: a moment is the same in
+  // every time zone. Only showing it as text depends on the zone.
+  if (invite.expiresAt < new Date()) {
+    return (
+      <main className="flex flex-1 flex-col items-center justify-center gap-4 py-16 text-center">
+        <h1 className="text-2xl font-bold text-ink">
+          This invitation has expired{" "}
+          <span aria-hidden="true">⌛</span>
+        </h1>
+        <p className="text-base text-muted">
+          {invite.authorName} can send you a new one.
+        </p>
+      </main>
+    );
   }
 
   const formatInfo = DATE_FORMATS[invite.format];
@@ -57,9 +76,9 @@ export default async function InvitePage(props: PageProps<"/i/[token]">) {
         {invite.message}
       </p>
 
-      {/* The choosing part reacts to clicks, so it is a client component.
+      {/* The answer form reacts to clicks, so it is a client component.
           We turn Date objects into strings before passing them down. */}
-      <InviteChoices
+      <InviteResponseForm
         times={invite.timeOptions.map((time) => ({
           id: time.id,
           startsAt: time.startsAt.toISOString(),

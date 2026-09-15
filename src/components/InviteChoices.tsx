@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { LocalDateTime } from "@/components/LocalDateTime";
+import { PLACE_NAME_MAX_LENGTH } from "@/lib/inviteRules";
 
 // Data that comes from the server page. Only plain values:
 // a Date object is sent as an ISO string, because props from the server
@@ -9,9 +9,25 @@ import { LocalDateTime } from "@/components/LocalDateTime";
 export type TimeOptionView = { id: number; startsAt: string };
 export type PlaceOptionView = { id: number; name: string; note: string | null };
 
+// What is picked in one group: an option id, "other" for the person's own
+// suggestion, or null when nothing is picked yet.
+export type Choice = number | "other" | null;
+
+// This component has no state of its own. The parent form keeps the state
+// and passes it down, because the form needs these values to send the answer.
 type InviteChoicesProps = {
   times: TimeOptionView[];
   places: PlaceOptionView[];
+  timeChoice: Choice;
+  placeChoice: Choice;
+  onTimeChoice: (choice: Choice) => void;
+  onPlaceChoice: (choice: Choice) => void;
+  // true when the person wants to suggest something else
+  allowOther: boolean;
+  otherTime: string; // "2026-09-12T18:00", the format of <input type="datetime-local">
+  otherPlace: string;
+  onOtherTime: (value: string) => void;
+  onOtherPlace: (value: string) => void;
 };
 
 const legendStyle =
@@ -27,10 +43,26 @@ const cardStyle =
   "peer-checked:border-brand peer-checked:bg-brand peer-checked:text-white " +
   "peer-focus-visible:ring-2 peer-focus-visible:ring-accent";
 
-export function InviteChoices({ times, places }: InviteChoicesProps) {
-  const [timeId, setTimeId] = useState<number | null>(null);
-  const [placeId, setPlaceId] = useState<number | null>(null);
+// The card for "my own suggestion" has a dashed border, so it looks
+// different from the real options.
+const otherCardStyle = `${cardStyle} border-dashed text-accent`;
 
+const fieldStyle =
+  "mt-2 w-full rounded-xl border border-line bg-surface px-3.5 py-3 text-base text-ink outline-none placeholder:text-quiet focus:border-accent";
+
+export function InviteChoices({
+  times,
+  places,
+  timeChoice,
+  placeChoice,
+  onTimeChoice,
+  onPlaceChoice,
+  allowOther,
+  otherTime,
+  otherPlace,
+  onOtherTime,
+  onOtherPlace,
+}: InviteChoicesProps) {
   return (
     <div className="flex flex-col gap-6">
       <fieldset className="border-0 p-0">
@@ -42,8 +74,8 @@ export function InviteChoices({ times, places }: InviteChoicesProps) {
                 type="radio"
                 id={`time-${time.id}`}
                 name="time"
-                checked={timeId === time.id}
-                onChange={() => setTimeId(time.id)}
+                checked={timeChoice === time.id}
+                onChange={() => onTimeChoice(time.id)}
                 className="peer sr-only"
               />
               <label htmlFor={`time-${time.id}`} className={cardStyle}>
@@ -51,6 +83,31 @@ export function InviteChoices({ times, places }: InviteChoicesProps) {
               </label>
             </div>
           ))}
+
+          {allowOther && (
+            <div>
+              <input
+                type="radio"
+                id="time-other"
+                name="time"
+                checked={timeChoice === "other"}
+                onChange={() => onTimeChoice("other")}
+                className="peer sr-only"
+              />
+              <label htmlFor="time-other" className={otherCardStyle}>
+                + Another time
+              </label>
+              {timeChoice === "other" && (
+                <input
+                  type="datetime-local"
+                  value={otherTime}
+                  onChange={(event) => onOtherTime(event.target.value)}
+                  aria-label="Your time"
+                  className={fieldStyle}
+                />
+              )}
+            </div>
+          )}
         </div>
       </fieldset>
 
@@ -63,8 +120,8 @@ export function InviteChoices({ times, places }: InviteChoicesProps) {
                 type="radio"
                 id={`place-${place.id}`}
                 name="place"
-                checked={placeId === place.id}
-                onChange={() => setPlaceId(place.id)}
+                checked={placeChoice === place.id}
+                onChange={() => onPlaceChoice(place.id)}
                 className="peer sr-only"
               />
               <label htmlFor={`place-${place.id}`} className={cardStyle}>
@@ -79,6 +136,33 @@ export function InviteChoices({ times, places }: InviteChoicesProps) {
               </label>
             </div>
           ))}
+
+          {allowOther && (
+            <div>
+              <input
+                type="radio"
+                id="place-other"
+                name="place"
+                checked={placeChoice === "other"}
+                onChange={() => onPlaceChoice("other")}
+                className="peer sr-only"
+              />
+              <label htmlFor="place-other" className={otherCardStyle}>
+                + Another place
+              </label>
+              {placeChoice === "other" && (
+                <input
+                  type="text"
+                  value={otherPlace}
+                  onChange={(event) => onOtherPlace(event.target.value)}
+                  placeholder="Where would you like to go?"
+                  maxLength={PLACE_NAME_MAX_LENGTH}
+                  aria-label="Your place"
+                  className={fieldStyle}
+                />
+              )}
+            </div>
+          )}
         </div>
       </fieldset>
     </div>

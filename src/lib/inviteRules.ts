@@ -7,6 +7,10 @@ export const MESSAGE_MAX_LENGTH = 120;
 export const PLACE_NAME_MAX_LENGTH = 60;
 export const PLACE_NOTE_MAX_LENGTH = 60;
 
+// The answer message is not shown on the small preview card,
+// so it can be longer than the invitation message.
+export const RESPONSE_MESSAGE_MAX_LENGTH = 300;
+
 export const MAX_TIME_OPTIONS = 5;
 export const MAX_PLACE_OPTIONS = 5;
 
