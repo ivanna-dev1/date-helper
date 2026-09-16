@@ -4,7 +4,7 @@ import Link from "next/link";
 export default function ManageNotFound() {
   return (
     <main className="flex flex-1 flex-col items-center justify-center gap-4 py-16 text-center">
-      <h1 className="text-2xl font-bold text-ink">We can't find this invitation</h1>
+      <h1 className="text-2xl font-bold text-ink">We can&apos;t find this invitation</h1>
       <p className="text-base text-muted">
         The link may be wrong or incomplete.
       </p>

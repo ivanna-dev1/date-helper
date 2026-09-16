@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { DateFormat, WhoPays } from "@/generated/prisma/enums";
 import { useDraftList } from "@/hooks/useDraftList";
+import { useBrowserValue } from "@/hooks/useBrowserValue";
 import { createInvite } from "@/app/actions";
 import {
   AUTHOR_NAME_MAX_LENGTH,
@@ -16,6 +17,7 @@ import {
   type InviteErrors,
 } from "@/lib/inviteRules";
 import { DATE_FORMATS, FORMAT_ORDER } from "@/lib/dateFormats";
+import { toUtcString } from "@/lib/time";
 
 // Ready-made lines, so the author does not stare at an empty field.
 // They depend on the format: a movie hint next to "Coffee" would feel wrong.
@@ -95,15 +97,11 @@ export function CreateInviteForm() {
   // from today in the browser (different time zones). If we rendered it
   // right away, the server HTML and the browser HTML would not match.
   // So we show the date only after the component is in the browser.
-  const [expiryDate, setExpiryDate] = useState<string | null>(null);
-
-  useEffect(() => {
+  const expiryDate = useBrowserValue<string | null>(() => {
     const date = new Date();
     date.setDate(date.getDate() + expiryDays);
-    setExpiryDate(
-      date.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-    );
-  }, [expiryDays]);
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  }, null);
 
   const times = useDraftList<TimeDraft>(createTimeDraft);
   const places = useDraftList<PlaceDraft>(createPlaceDraft);
@@ -130,11 +128,7 @@ export function CreateInviteForm() {
         expiryDays,
         // Turn local time into UTC here, in the browser. Only the browser
         // knows the author's time zone. The server may run in another one.
-        times: times.items.map((time) => {
-          const date = new Date(time.value);
-          // An empty or broken value goes as it is. The server will say what is wrong.
-          return Number.isNaN(date.getTime()) ? time.value : date.toISOString();
-        }),
+        times: times.items.map((time) => toUtcString(time.value)),
         places: places.items.map((place) => ({
           name: place.name,
           note: place.note,

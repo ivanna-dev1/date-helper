@@ -28,6 +28,9 @@ type InviteChoicesProps = {
   otherPlace: string;
   onOtherTime: (value: string) => void;
   onOtherPlace: (value: string) => void;
+  // Messages from the server, shown under each group.
+  timeError?: string;
+  placeError?: string;
 };
 
 const legendStyle =
@@ -50,6 +53,8 @@ const otherCardStyle = `${cardStyle} border-dashed text-accent`;
 const fieldStyle =
   "mt-2 w-full rounded-xl border border-line bg-surface px-3.5 py-3 text-base text-ink outline-none placeholder:text-quiet focus:border-accent";
 
+const errorStyle = "mt-1.5 text-xs text-accent";
+
 export function InviteChoices({
   times,
   places,
@@ -62,6 +67,8 @@ export function InviteChoices({
   otherPlace,
   onOtherTime,
   onOtherPlace,
+  timeError,
+  placeError,
 }: InviteChoicesProps) {
   return (
     <div className="flex flex-col gap-6">
@@ -109,6 +116,7 @@ export function InviteChoices({
             </div>
           )}
         </div>
+        {timeError && <p className={errorStyle}>{timeError}</p>}
       </fieldset>
 
       <fieldset className="border-0 p-0">
@@ -164,6 +172,7 @@ export function InviteChoices({
             </div>
           )}
         </div>
+        {placeError && <p className={errorStyle}>{placeError}</p>}
       </fieldset>
     </div>
   );

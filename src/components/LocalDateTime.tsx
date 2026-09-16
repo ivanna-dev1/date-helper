@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useBrowserValue } from "@/hooks/useBrowserValue";
 
 type LocalDateTimeProps = {
   value: string; // ISO string, for example "2026-09-12T15:00:00.000Z"
@@ -11,13 +11,11 @@ type LocalDateTimeProps = {
  *
  * The database keeps time in UTC. The server does not know where the
  * reader is, so only the browser can turn UTC into local time. That is why
- * this is a client component and why we format inside useEffect.
+ * this is a client component and why the text is read in the browser only.
  */
 export function LocalDateTime({ value }: LocalDateTimeProps) {
-  const [text, setText] = useState<string | null>(null);
-
-  useEffect(() => {
-    setText(
+  const text = useBrowserValue<string | null>(
+    () =>
       new Date(value).toLocaleString("en-US", {
         weekday: "short",
         month: "short",
@@ -25,8 +23,8 @@ export function LocalDateTime({ value }: LocalDateTimeProps) {
         hour: "numeric",
         minute: "2-digit",
       }),
-    );
-  }, [value]);
+    null,
+  );
 
   return <time dateTime={value}>{text ?? "…"}</time>;
 }

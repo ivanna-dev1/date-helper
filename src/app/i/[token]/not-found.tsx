@@ -4,7 +4,7 @@ import Link from "next/link";
 export default function InviteNotFound() {
   return (
     <main className="flex flex-1 flex-col items-center justify-center gap-4 py-16 text-center">
-      <h1 className="text-2xl font-bold text-ink">This invitation doesn't exist</h1>
+      <h1 className="text-2xl font-bold text-ink">This invitation doesn&apos;t exist</h1>
       <p className="text-base text-muted">
         The link may be wrong or incomplete. Ask the person who sent it.
       </p>

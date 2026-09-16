@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { InviteStatus, ResponseType } from "@/generated/prisma/enums";
+import { submitResponse } from "@/app/actions";
 import {
   InviteChoices,
   type Choice,
@@ -11,6 +13,10 @@ import {
   AUTHOR_NAME_MAX_LENGTH,
   RESPONSE_MESSAGE_MAX_LENGTH,
 } from "@/lib/inviteRules";
+import type { ResponseErrors } from "@/lib/responseRules";
+import { toUtcString } from "@/lib/time";
+import { ResponseSummary } from "@/components/ResponseSummary";
+import { getOutcome, type SentAnswer } from "@/lib/responseView";
 
 // Three ways to answer. The mode decides what the form shows.
 // "yes"     — pick a time and a place from the author's options
@@ -18,7 +24,16 @@ import {
 // "no"      — the options are hidden, only your name and a few words
 type Mode = "yes" | "counter" | "no";
 
+// Which kind of answer each mode sends to the server.
+const TYPE_BY_MODE: Record<Mode, ResponseType> = {
+  yes: ResponseType.YES,
+  counter: ResponseType.COUNTER,
+  no: ResponseType.NO,
+};
+
 type InviteResponseFormProps = {
+  token: string;
+  authorName: string; // for the text on the screen after sending
   times: TimeOptionView[];
   places: PlaceOptionView[];
 };
@@ -27,6 +42,7 @@ const labelStyle =
   "mb-1.5 text-xs font-medium uppercase tracking-wide text-muted";
 const fieldStyle =
   "rounded-xl border border-line bg-surface px-3.5 py-3 text-base text-ink outline-none placeholder:text-quiet focus:border-accent";
+const errorStyle = "mt-1 text-xs text-accent";
 
 // The text on the main button changes with the mode.
 const SUBMIT_LABELS: Record<Mode, string> = {
@@ -41,7 +57,12 @@ const MESSAGE_PLACEHOLDERS: Record<Mode, string> = {
   no: "Thank you for asking, but I can't this time",
 };
 
-export function InviteResponseForm({ times, places }: InviteResponseFormProps) {
+export function InviteResponseForm({
+  token,
+  authorName,
+  times,
+  places,
+}: InviteResponseFormProps) {
   const [mode, setMode] = useState<Mode>("yes");
 
   // The state lives here, not in InviteChoices: this form will send it.
@@ -53,17 +74,90 @@ export function InviteResponseForm({ times, places }: InviteResponseFormProps) {
   const [name, setName] = useState("");
   const [message, setMessage] = useState("");
 
-  function backToYes() {
-    setMode("yes");
+  const [isSending, setIsSending] = useState(false);
+  const [errors, setErrors] = useState<ResponseErrors>({});
+  // What was sent. While it is null, the form is shown.
+  const [sentAnswer, setSentAnswer] = useState<SentAnswer | null>(null);
+
+  function changeMode(nextMode: Mode) {
+    setMode(nextMode);
+    // Old messages are about the old mode, so they would only confuse.
+    setErrors({});
     // "Another time" and "Another place" exist only in the counter mode.
     // If one of them was picked, clear it so no hidden choice stays behind.
-    if (timeChoice === "other") setTimeChoice(null);
-    if (placeChoice === "other") setPlaceChoice(null);
+    if (nextMode !== "counter") {
+      if (timeChoice === "other") setTimeChoice(null);
+      if (placeChoice === "other") setPlaceChoice(null);
+    }
   }
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    // Saving the answer comes in step 5.5, with a Server Action.
+    setIsSending(true);
+    setErrors({});
+
+    const isNo = mode === "no";
+    const isCounter = mode === "counter";
+    const type = TYPE_BY_MODE[mode];
+
+    // For "no" nothing is picked, even if something was picked before.
+    const timeId = !isNo && typeof timeChoice === "number" ? timeChoice : null;
+    const placeId =
+      !isNo && typeof placeChoice === "number" ? placeChoice : null;
+    // Own time goes as UTC, turned in the browser (see src/lib/time.ts).
+    const proposedTime =
+      isCounter && timeChoice === "other" && otherTime !== ""
+        ? toUtcString(otherTime)
+        : null;
+    const proposedPlace =
+      isCounter && placeChoice === "other" ? otherPlace.trim() || null : null;
+
+    try {
+      const result = await submitResponse({
+        token,
+        type,
+        respondentName: name,
+        message,
+        timeId,
+        placeId,
+        proposedTime,
+        proposedPlace,
+      });
+
+      if (result.ok) {
+        // The same values the server got, in a form the screen can show.
+        // An own value wins over a picked option, like on the server.
+        setSentAnswer({
+          // Right after answering, the author has not decided anything yet.
+          outcome: getOutcome(type, InviteStatus.PENDING),
+          time:
+            proposedTime ??
+            times.find((time) => time.id === timeId)?.startsAt ??
+            null,
+          place:
+            proposedPlace ??
+            places.find((place) => place.id === placeId)?.name ??
+            null,
+          isOwnTime: proposedTime !== null,
+          isOwnPlace: proposedPlace !== null,
+        });
+      } else {
+        setErrors(result.errors);
+      }
+    } finally {
+      setIsSending(false);
+    }
+  }
+
+  if (sentAnswer) {
+    return (
+      <ResponseSummary
+        answer={sentAnswer}
+        authorName={authorName}
+        path={`/i/${token}`}
+        isJustSent
+      />
+    );
   }
 
   return (
@@ -82,6 +176,8 @@ export function InviteResponseForm({ times, places }: InviteResponseFormProps) {
           otherPlace={otherPlace}
           onOtherTime={setOtherTime}
           onOtherPlace={setOtherPlace}
+          timeError={errors.time}
+          placeError={errors.place}
         />
       )}
 
@@ -105,6 +201,9 @@ export function InviteResponseForm({ times, places }: InviteResponseFormProps) {
           maxLength={AUTHOR_NAME_MAX_LENGTH}
           className={fieldStyle}
         />
+        {errors.respondentName && (
+          <p className={errorStyle}>{errors.respondentName}</p>
+        )}
       </div>
 
       <div className="flex flex-col">
@@ -120,14 +219,20 @@ export function InviteResponseForm({ times, places }: InviteResponseFormProps) {
           rows={3}
           className={`${fieldStyle} resize-none`}
         />
+        {errors.message && <p className={errorStyle}>{errors.message}</p>}
       </div>
 
       <div className="flex flex-col gap-2">
+        {errors.form && (
+          <p className="text-center text-sm text-accent">{errors.form}</p>
+        )}
+
         <button
           type="submit"
-          className="rounded-2xl bg-brand py-4 text-base font-semibold text-white"
+          disabled={isSending}
+          className="rounded-2xl bg-brand py-4 text-base font-semibold text-white disabled:opacity-60"
         >
-          {SUBMIT_LABELS[mode]}
+          {isSending ? "Sending…" : SUBMIT_LABELS[mode]}
         </button>
 
         {/* The buttons below the main one follow the mockup: the calm
@@ -136,23 +241,23 @@ export function InviteResponseForm({ times, places }: InviteResponseFormProps) {
           <>
             <button
               type="button"
-              onClick={() => setMode("counter")}
+              onClick={() => changeMode("counter")}
               className="rounded-xl border border-line py-3 text-sm font-medium text-muted"
             >
               Suggest another option
             </button>
             <button
               type="button"
-              onClick={() => setMode("no")}
+              onClick={() => changeMode("no")}
               className="py-2 text-sm text-quiet"
             >
-              Sorry, I can't
+              Sorry, I can&apos;t
             </button>
           </>
         ) : (
           <button
             type="button"
-            onClick={backToYes}
+            onClick={() => changeMode("yes")}
             className="py-2 text-sm text-quiet"
           >
             ← Back
