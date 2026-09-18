@@ -10,6 +10,10 @@ import { DATE_FORMATS } from "@/lib/dateFormats";
 // The text of the preview card that a messenger shows under a link.
 // Short on purpose: messengers cut long titles.
 export type InviteCard = {
+  // A short word for the state. It goes into the address of the picture,
+  // so a messenger sees a new address and does not show the old one
+  // from its memory.
+  tag: string;
   emoji: string;
   title: string;
   subtitle: string;
@@ -53,6 +57,7 @@ export function getInviteCard(invite: CardInput): InviteCard {
 
   if (invite.status === InviteStatus.CANCELLED) {
     return {
+      tag: "cancelled",
       emoji: "🌷",
       title: "This date was cancelled",
       subtitle: `${author} cancelled the plan`,
@@ -61,6 +66,7 @@ export function getInviteCard(invite: CardInput): InviteCard {
   }
   if (invite.status === InviteStatus.CONFIRMED && guest) {
     return {
+      tag: "yes",
       emoji: "🎉",
       title: "It's a date!",
       subtitle: `${author} and ${guest} have a plan`,
@@ -69,6 +75,7 @@ export function getInviteCard(invite: CardInput): InviteCard {
   }
   if (invite.status === InviteStatus.COUNTER && guest) {
     return {
+      tag: "counter",
       emoji: "📨",
       title: `${guest} suggested another option`,
       subtitle: `Waiting for ${author} to answer`,
@@ -79,6 +86,7 @@ export function getInviteCard(invite: CardInput): InviteCard {
     // Both "no" from the guest and "no" from the author end here.
     const byGuest = invite.response?.type === ResponseType.NO;
     return {
+      tag: "no",
       emoji: "🌷",
       title: "Not this time",
       subtitle: byGuest
@@ -89,6 +97,7 @@ export function getInviteCard(invite: CardInput): InviteCard {
   }
   if (invite.expiresAt < new Date()) {
     return {
+      tag: "expired",
       emoji: "⌛",
       title: "This invitation has expired",
       subtitle: `${author} can send a new one`,
@@ -98,6 +107,7 @@ export function getInviteCard(invite: CardInput): InviteCard {
 
   const message = invite.message.trim();
   return {
+    tag: "new",
     emoji: format.emoji,
     title: `${author} ${format.invitePhrase}`,
     subtitle: "Pick a time and a place",

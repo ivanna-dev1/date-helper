@@ -58,7 +58,9 @@ export function ResponseSummary({
 }: ResponseSummaryProps) {
   const { outcome } = answer;
   const heading = HEADINGS[outcome];
-  const shareText = SHARE_TEXTS[outcome];
+  // The button is only for the moment right after answering.
+  // Later the author already knows, so showing it again confuses.
+  const shareText = isJustSent ? SHARE_TEXTS[outcome] : undefined;
   // The date is agreed: show the shared plan instead of the answer details.
   const isAgreed = outcome === "yes" || outcome === "suggestionAccepted";
 

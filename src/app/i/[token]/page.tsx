@@ -22,7 +22,23 @@ export async function generateMetadata(
   return {
     title,
     description,
-    openGraph: { title, description, siteName: "Date Helper" },
+    openGraph: {
+      title,
+      description,
+      siteName: "Date Helper",
+      // The tag in the address changes with the state of the date.
+      // Without it a messenger keeps showing the first picture it saw.
+      images: card
+        ? [
+            {
+              url: `/i/${token}/opengraph-image?state=${card.tag}`,
+              width: 1200,
+              height: 630,
+              alt: "An invitation from Date Helper",
+            },
+          ]
+        : undefined,
+    },
     // The link works like a password. Search engines must not show it.
     robots: { index: false, follow: false },
   };
