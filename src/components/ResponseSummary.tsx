@@ -85,21 +85,33 @@ export function ResponseSummary({
           invitePath={path}
           friendPath={`/f/${friendToken}`}
           eventTitle={`Date with ${authorName}`}
+          // The answer is saved, but the author gets no message from us,
+          // so telling them is the first button under the plan.
+          notifyButton={
+            shareText ? (
+              <ShareMenu
+                // The tag changes the address, so the messenger loads a fresh
+                // preview instead of the one it remembered for this link.
+                path={`${path}?s=${outcome}`}
+                text={shareText}
+                buttonLabel={`Let ${authorName} know`}
+                hint={isJustSent ? `${authorName} doesn't know yet` : undefined}
+              />
+            ) : null
+          }
         />
       )}
-      {outcome === "suggested" && (
-        <AnswerDetails answer={answer} ownNote="(your idea)" />
-      )}
-
-      {/* The answer is saved, but the author gets no message from us.
-          So telling them is the main action of this screen. */}
-      {shareText && (
+      {!isAgreed && shareText && (
         <ShareMenu
-          path={path}
+          path={`${path}?s=${outcome}`}
           text={shareText}
           buttonLabel={`Let ${authorName} know`}
           hint={isJustSent ? `${authorName} doesn't know yet` : undefined}
         />
+      )}
+
+      {outcome === "suggested" && (
+        <AnswerDetails answer={answer} ownNote="(your idea)" />
       )}
 
       {outcome === "suggested" && (

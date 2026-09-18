@@ -88,13 +88,31 @@ export function AuthorAnswer({
           invitePath={publicPath}
           friendPath={`/f/${friendToken}`}
           eventTitle={`Date with ${respondentName}`}
+          // The invited person does not know the decision yet,
+          // so this button stands first under the plan.
+          notifyButton={
+            shareText ? (
+              <ShareMenu
+                // The tag changes the address, so the messenger loads a
+                // fresh preview instead of the one it remembered.
+                path={`${publicPath}?s=${outcome}`}
+                text={shareText}
+                buttonLabel={`Let ${respondentName} know`}
+              />
+            ) : null
+          }
         />
       )}
-      {outcome === "suggested" && (
-        <AnswerDetails
-          answer={answer}
-          ownNote={`(${respondentName}'s idea)`}
+      {!isAgreed && shareText && (
+        <ShareMenu
+          path={`${publicPath}?s=${outcome}`}
+          text={shareText}
+          buttonLabel={`Let ${respondentName} know`}
         />
+      )}
+
+      {outcome === "suggested" && (
+        <AnswerDetails answer={answer} ownNote={`(${respondentName}'s idea)`} />
       )}
 
       {message && (
@@ -105,14 +123,6 @@ export function AuthorAnswer({
 
       {outcome === "suggested" && (
         <SuggestionDecision secretToken={secretToken} />
-      )}
-
-      {shareText && (
-        <ShareMenu
-          path={publicPath}
-          text={shareText}
-          buttonLabel={`Let ${respondentName} know`}
-        />
       )}
 
       {isNo && (

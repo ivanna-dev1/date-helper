@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { CalendarMenu } from "@/components/CalendarMenu";
 import { LocalDateTime } from "@/components/LocalDateTime";
@@ -5,7 +6,13 @@ import { ShareMenu } from "@/components/ShareMenu";
 import { buildGoogleCalendarUrl, DATE_LENGTH_MINUTES } from "@/lib/calendar";
 import type { SentAnswer } from "@/lib/responseView";
 
+// The same look for the calm buttons under the plan.
+const QUIET_BUTTON =
+  "w-full rounded-xl border border-line py-3 text-center text-sm font-medium text-muted";
+
 type DatePlanProps = {
+  // The "Let … know" button. It stands first in the group of buttons.
+  notifyButton?: ReactNode;
   answer: SentAnswer;
   whoPaysText: string | null;
   invitePath: string; // "/i/k7Fq2mXp9RtA"
@@ -22,6 +29,7 @@ export function DatePlan({
   invitePath,
   friendPath,
   eventTitle,
+  notifyButton,
 }: DatePlanProps) {
   const location = [answer.place, answer.placeNote].filter(Boolean).join(", ");
 
@@ -30,13 +38,6 @@ export function DatePlan({
       {answer.time && (
         <p className="text-base font-semibold text-ink">
           <LocalDateTime value={answer.time} format="long" />
-          {" · "}
-          <Link
-            href={`/weather?back=${encodeURIComponent(invitePath)}`}
-            className="text-sm font-normal text-muted underline"
-          >
-            Weather
-          </Link>
         </p>
       )}
 
@@ -53,6 +54,8 @@ export function DatePlan({
         <p className="text-xs italic text-quiet">{whoPaysText}</p>
       )}
 
+      {notifyButton}
+
       {answer.time && (
         <CalendarMenu
           googleUrl={buildGoogleCalendarUrl({
@@ -64,6 +67,15 @@ export function DatePlan({
           icsPath={`${invitePath}/calendar`}
         />
       )}
+
+      {/* The weather is not ready yet, so the button leads to a page
+          that says so. */}
+      <Link
+        href={`/weather?back=${encodeURIComponent(invitePath)}`}
+        className={QUIET_BUTTON}
+      >
+        Weather
+      </Link>
 
       {/* A calm, secondary button: easy to find for those who need it,
           and not loud for everyone else. */}

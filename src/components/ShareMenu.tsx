@@ -18,8 +18,10 @@ const BUTTON_STYLES = {
   quiet: "rounded-xl border border-line py-3 text-sm font-medium text-muted",
 };
 
+// Small chips in rows of three: the list should not shout louder
+// than the card itself.
 const optionStyle =
-  "flex items-center justify-center rounded-xl border border-line bg-surface px-3 py-3 text-sm font-medium text-ink";
+  "flex items-center justify-center gap-1 rounded-lg border border-line bg-surface px-2 py-1.5 text-xs font-medium text-ink";
 
 /**
  * A main button that opens a list of messengers.
@@ -72,10 +74,12 @@ export function ShareMenu({
   return (
     <div className="flex w-full flex-col gap-3">
       {hint && !isPicked && (
-        <p className="text-center text-sm font-medium text-accent">{hint}</p>
+        <p className="text-center text-base font-semibold text-accent">
+          {hint}
+        </p>
       )}
       {isPicked && (
-        <p className="text-center text-sm font-medium text-accent">
+        <p className="text-center text-base font-semibold text-accent">
           Sent? Great!
         </p>
       )}
@@ -91,7 +95,7 @@ export function ShareMenu({
       </button>
 
       {isOpen && (
-        <div id={optionsId} className="grid grid-cols-2 gap-2">
+        <div id={optionsId} className="grid grid-cols-3 gap-1.5">
           {SHARE_TARGETS.map((target) => (
             <a
               key={target.name}
@@ -116,12 +120,12 @@ export function ShareMenu({
               onClick={handleSystemShare}
               className={optionStyle}
             >
-              More…
+              More
             </button>
           )}
 
           <button type="button" onClick={handleCopy} className={optionStyle}>
-            {isCopied ? "Copied!" : "Copy link"}
+            {isCopied ? "Copied!" : "Copy"}
           </button>
         </div>
       )}

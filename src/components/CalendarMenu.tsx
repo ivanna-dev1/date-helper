@@ -23,7 +23,8 @@ export function CalendarMenu({ googleUrl, icsPath }: CalendarMenuProps) {
         onClick={() => setIsOpen(!isOpen)}
         aria-expanded={isOpen}
         aria-controls={optionsId}
-        className="w-full rounded-2xl border-2 border-accent py-3 text-base font-semibold text-accent"
+        // The same calm look as the other buttons under the plan.
+        className="w-full rounded-xl border border-line py-3 text-sm font-medium text-muted"
       >
         Add to calendar
       </button>
