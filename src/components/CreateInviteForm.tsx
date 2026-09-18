@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { DateFormat, WhoPays } from "@/generated/prisma/enums";
 import { useDraftList } from "@/hooks/useDraftList";
 import { useBrowserValue } from "@/hooks/useBrowserValue";
@@ -110,15 +110,22 @@ export function CreateInviteForm() {
 
   const [isSaving, setIsSaving] = useState(false);
   const [errors, setErrors] = useState<InviteErrors>({});
+  // A second lock next to isSaving. State changes only on the next render,
+  // so two very fast clicks could both see isSaving === false and create
+  // two invitations. A ref changes at once, so the second click stops here.
+  const isSavingRef = useRef(false);
 
   // Without preventDefault the browser does its old default: it reloads the
   // page and puts the form fields into the address bar. Private data must
   // never go into a URL.
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (isSavingRef.current) return;
+    isSavingRef.current = true;
     setIsSaving(true);
     setErrors({});
 
+    let hasErrors = false;
     try {
       const result = await createInvite({
         authorName,
@@ -138,10 +145,19 @@ export function CreateInviteForm() {
       // On success the server redirects to the author page, so we get a
       // result only when something is wrong.
       if (result) {
+        hasErrors = true;
         setErrors(result.errors);
       }
+    } catch (error) {
+      hasErrors = true;
+      throw error;
     } finally {
-      setIsSaving(false);
+      // After success the page is about to change, so the button stays
+      // locked. Only a problem unlocks it, so the author can fix and retry.
+      if (hasErrors) {
+        isSavingRef.current = false;
+        setIsSaving(false);
+      }
     }
   }
 

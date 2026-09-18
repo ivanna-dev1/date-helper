@@ -26,6 +26,8 @@ export default async function ManagePage(
     where: { secretToken },
     select: {
       authorName: true,
+      whoPays: true,
+      friendToken: true,
       publicToken: true,
       format: true,
       expiresAt: true,
@@ -93,8 +95,11 @@ export default async function ManagePage(
         <AuthorAnswer
           answer={toSentAnswer(response, invite.status)}
           respondentName={response.respondentName}
+          authorName={invite.authorName}
+          whoPays={invite.whoPays}
           message={response.message}
           secretToken={secretToken}
+          friendToken={invite.friendToken}
           publicPath={publicPath}
         />
         {/* After "no" (the first answer or the author's) there is

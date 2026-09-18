@@ -1,4 +1,7 @@
+import type { WhoPays } from "@/generated/prisma/enums";
 import { AnswerDetails } from "@/components/AnswerDetails";
+import { DatePlan } from "@/components/DatePlan";
+import { getWhoPaysText } from "@/lib/whoPays";
 import { ShareMenu } from "@/components/ShareMenu";
 import type { AnswerOutcome, SentAnswer } from "@/lib/responseView";
 
@@ -9,6 +12,8 @@ import type { AnswerOutcome, SentAnswer } from "@/lib/responseView";
 type ResponseSummaryProps = {
   answer: SentAnswer;
   authorName: string;
+  whoPays: WhoPays | null;
+  friendToken: string; // for "Let a friend know where I am"
   path: string; // the invitation link, "/i/k7Fq2mXp9RtA"
   // true right after sending. false when the link is opened again:
   // then the author has most likely been told already.
@@ -46,13 +51,16 @@ const SHARE_TEXTS: Partial<Record<AnswerOutcome, string>> = {
 export function ResponseSummary({
   answer,
   authorName,
+  whoPays,
+  friendToken,
   path,
   isJustSent,
 }: ResponseSummaryProps) {
   const { outcome } = answer;
   const heading = HEADINGS[outcome];
   const shareText = SHARE_TEXTS[outcome];
-  const showDetails = outcome !== "no" && outcome !== "suggestionDeclined";
+  // The date is agreed: show the shared plan instead of the answer details.
+  const isAgreed = outcome === "yes" || outcome === "suggestionAccepted";
 
   return (
     <section className="flex flex-col items-center gap-6 rounded-2xl border border-line bg-surface px-5 py-8 text-center">
@@ -70,7 +78,18 @@ export function ResponseSummary({
         </p>
       )}
 
-      {showDetails && <AnswerDetails answer={answer} ownNote="(your idea)" />}
+      {isAgreed && (
+        <DatePlan
+          answer={answer}
+          whoPaysText={getWhoPaysText(whoPays, authorName, "guest")}
+          invitePath={path}
+          friendPath={`/f/${friendToken}`}
+          eventTitle={`Date with ${authorName}`}
+        />
+      )}
+      {outcome === "suggested" && (
+        <AnswerDetails answer={answer} ownNote="(your idea)" />
+      )}
 
       {/* The answer is saved, but the author gets no message from us.
           So telling them is the main action of this screen. */}

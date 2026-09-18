@@ -1,7 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { InviteStatus, ResponseType } from "@/generated/prisma/enums";
+import {
+  InviteStatus,
+  ResponseType,
+  type WhoPays,
+} from "@/generated/prisma/enums";
 import { submitResponse } from "@/app/actions";
 import {
   InviteChoices,
@@ -34,6 +38,8 @@ const TYPE_BY_MODE: Record<Mode, ResponseType> = {
 type InviteResponseFormProps = {
   token: string;
   authorName: string; // for the text on the screen after sending
+  whoPays: WhoPays | null;
+  friendToken: string;
   times: TimeOptionView[];
   places: PlaceOptionView[];
 };
@@ -60,6 +66,8 @@ const MESSAGE_PLACEHOLDERS: Record<Mode, string> = {
 export function InviteResponseForm({
   token,
   authorName,
+  whoPays,
+  friendToken,
   times,
   places,
 }: InviteResponseFormProps) {
@@ -138,6 +146,9 @@ export function InviteResponseForm({
             proposedPlace ??
             places.find((place) => place.id === placeId)?.name ??
             null,
+          placeNote: proposedPlace
+            ? null
+            : (places.find((place) => place.id === placeId)?.note ?? null),
           isOwnTime: proposedTime !== null,
           isOwnPlace: proposedPlace !== null,
         });
@@ -154,6 +165,8 @@ export function InviteResponseForm({
       <ResponseSummary
         answer={sentAnswer}
         authorName={authorName}
+        whoPays={whoPays}
+        friendToken={friendToken}
         path={`/i/${token}`}
         isJustSent
       />

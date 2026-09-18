@@ -1,17 +1,10 @@
 import type { Prisma } from "@/generated/prisma/client";
-import {
-  InviteStatus,
-  ResponseType,
-} from "@/generated/prisma/enums";
+import { InviteStatus, ResponseType } from "@/generated/prisma/enums";
 
 // Where the story of an invitation is now, as the screens see it.
 // "suggested" means the author has not decided yet.
 export type AnswerOutcome =
-  | "yes"
-  | "no"
-  | "suggested"
-  | "suggestionAccepted"
-  | "suggestionDeclined";
+  "yes" | "no" | "suggested" | "suggestionAccepted" | "suggestionDeclined";
 
 // An answer in a simple form, ready to show on the screen.
 // Only plain values, so it can go from the server to a client component.
@@ -19,6 +12,7 @@ export type SentAnswer = {
   outcome: AnswerOutcome;
   time: string | null; // ISO string
   place: string | null;
+  placeNote: string | null; // the author's hint, "by the entrance"
   isOwnTime: boolean; // true when the person suggested their own time
   isOwnPlace: boolean;
 };
@@ -32,7 +26,7 @@ export const RESPONSE_VIEW_SELECT = {
   proposedTime: true,
   proposedPlace: true,
   chosenTime: { select: { startsAt: true } },
-  chosenPlace: { select: { name: true } },
+  chosenPlace: { select: { name: true, note: true } },
 } satisfies Prisma.ResponseSelect;
 
 // The type of one answer loaded with the select above.
@@ -67,6 +61,10 @@ export function toSentAnswer(
     // Date objects become strings before going to the client.
     time: time ? time.toISOString() : null,
     place: place ?? null,
+    // An own place has no note: only the author writes notes.
+    placeNote: response.proposedPlace
+      ? null
+      : (response.chosenPlace?.note ?? null),
     isOwnTime: response.proposedTime !== null,
     isOwnPlace: response.proposedPlace !== null,
   };

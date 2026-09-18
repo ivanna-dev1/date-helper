@@ -5,13 +5,28 @@ import { InviteResponseForm } from "@/components/InviteResponseForm";
 import { ResponseSummary } from "@/components/ResponseSummary";
 import { InviteStatus } from "@/generated/prisma/enums";
 import { DATE_FORMATS } from "@/lib/dateFormats";
+import { getInviteCard, getInviteForCard } from "@/lib/inviteCard";
 import { RESPONSE_VIEW_SELECT, toSentAnswer } from "@/lib/responseView";
 
-export const metadata: Metadata = {
-  title: "You are invited — Date Helper",
-  // The link works like a password. Search engines must not show it.
-  robots: { index: false, follow: false },
-};
+// The title and description a messenger shows next to the picture.
+// They follow the state of the date, like the picture does.
+export async function generateMetadata(
+  props: PageProps<"/i/[token]">,
+): Promise<Metadata> {
+  const { token } = await props.params;
+  const invite = await getInviteForCard(token);
+  const card = invite ? getInviteCard(invite) : null;
+  const title = card ? `${card.title} ${card.emoji}` : "Date Helper";
+  const description = card?.subtitle ?? "Ask someone out, the easy way";
+
+  return {
+    title,
+    description,
+    openGraph: { title, description, siteName: "Date Helper" },
+    // The link works like a password. Search engines must not show it.
+    robots: { index: false, follow: false },
+  };
+}
 
 export default async function InvitePage(props: PageProps<"/i/[token]">) {
   const { token } = await props.params;
@@ -19,12 +34,15 @@ export default async function InvitePage(props: PageProps<"/i/[token]">) {
   // One call. The nested `select` loads the time and place rows together
   // with the invite. Prisma makes one query per table, not one per option,
   // so the number of queries does not grow with the number of options.
-  // We use `select`, not `include`: `include` would also load secretToken
-  // and friendToken, and this page must never have them.
+  // We use `select`, not `include`: `include` would also load secretToken,
+  // and this page must never have it. friendToken is fine here: it only
+  // opens a read-only page with the same details this person already sees.
   const invite = await prisma.invite.findUnique({
     where: { publicToken: token },
     select: {
       authorName: true,
+      whoPays: true,
+      friendToken: true,
       message: true,
       format: true,
       expiresAt: true,
@@ -96,6 +114,8 @@ export default async function InvitePage(props: PageProps<"/i/[token]">) {
         <ResponseSummary
           answer={toSentAnswer(response, invite.status)}
           authorName={invite.authorName}
+          whoPays={invite.whoPays}
+          friendToken={invite.friendToken}
           path={`/i/${token}`}
           isJustSent={false}
         />
@@ -130,6 +150,8 @@ export default async function InvitePage(props: PageProps<"/i/[token]">) {
       <InviteResponseForm
         token={token}
         authorName={invite.authorName}
+        whoPays={invite.whoPays}
+        friendToken={invite.friendToken}
         times={invite.timeOptions.map((time) => ({
           id: time.id,
           startsAt: time.startsAt.toISOString(),

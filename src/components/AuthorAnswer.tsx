@@ -1,5 +1,8 @@
 import Link from "next/link";
+import type { WhoPays } from "@/generated/prisma/enums";
 import { AnswerDetails } from "@/components/AnswerDetails";
+import { DatePlan } from "@/components/DatePlan";
+import { getWhoPaysText } from "@/lib/whoPays";
 import { ShareMenu } from "@/components/ShareMenu";
 import { SuggestionDecision } from "@/components/SuggestionDecision";
 import type { AnswerOutcome, SentAnswer } from "@/lib/responseView";
@@ -7,8 +10,11 @@ import type { AnswerOutcome, SentAnswer } from "@/lib/responseView";
 type AuthorAnswerProps = {
   answer: SentAnswer;
   respondentName: string;
+  authorName: string;
+  whoPays: WhoPays | null;
   message: string | null; // the invited person's few words, if any
   secretToken: string; // for the accept / decline buttons
+  friendToken: string; // for "Let a friend know where I am"
   publicPath: string; // the invited person's link, "/i/k7Fq2mXp9RtA"
 };
 
@@ -17,7 +23,8 @@ const HEADINGS: Record<
   AnswerOutcome,
   { emoji: string; title: (name: string) => string }
 > = {
-  yes: { emoji: "🎉", title: (name) => `${name} said yes!` },
+  // An agreed date has the same heading for both people.
+  yes: { emoji: "🎉", title: () => "It's a date!" },
   no: { emoji: "🌷", title: (name) => `${name} can't this time` },
   suggested: {
     emoji: "📨",
@@ -41,14 +48,18 @@ const SHARE_TEXTS: Partial<Record<AnswerOutcome, string>> = {
 export function AuthorAnswer({
   answer,
   respondentName,
+  authorName,
+  whoPays,
   message,
   secretToken,
+  friendToken,
   publicPath,
 }: AuthorAnswerProps) {
   const { outcome } = answer;
   const heading = HEADINGS[outcome];
   const shareText = SHARE_TEXTS[outcome];
   const isNo = outcome === "no" || outcome === "suggestionDeclined";
+  const isAgreed = outcome === "yes" || outcome === "suggestionAccepted";
 
   return (
     <section className="flex flex-col items-center gap-6 rounded-2xl border border-line bg-surface px-5 py-8 text-center">
@@ -60,14 +71,26 @@ export function AuthorAnswer({
         <span aria-hidden="true">{heading.emoji}</span>
       </h2>
 
+      {outcome === "yes" && (
+        <p className="-mt-3 text-sm text-muted">{respondentName} said yes.</p>
+      )}
       {outcome === "suggestionAccepted" && (
         <p className="-mt-3 text-sm text-muted">
           You accepted {respondentName}&apos;s suggestion.
         </p>
       )}
 
-      {/* When the answer is "no", there is no time and no place to show. */}
-      {!isNo && (
+      {/* The date is agreed: the same plan as the invited person sees. */}
+      {isAgreed && (
+        <DatePlan
+          answer={answer}
+          whoPaysText={getWhoPaysText(whoPays, authorName, "author")}
+          invitePath={publicPath}
+          friendPath={`/f/${friendToken}`}
+          eventTitle={`Date with ${respondentName}`}
+        />
+      )}
+      {outcome === "suggested" && (
         <AnswerDetails
           answer={answer}
           ownNote={`(${respondentName}'s idea)`}

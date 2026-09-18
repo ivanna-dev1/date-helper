@@ -9,6 +9,13 @@ type ShareMenuProps = {
   text: string; // the message; the link is added after it
   buttonLabel: string; // "Let Olia know"
   hint?: string; // a line above the button until something is picked
+  // "main": the big pink button. "quiet": an outlined secondary button.
+  variant?: "main" | "quiet";
+};
+
+const BUTTON_STYLES = {
+  main: "rounded-2xl bg-brand py-4 text-base font-semibold text-white",
+  quiet: "rounded-xl border border-line py-3 text-sm font-medium text-muted",
 };
 
 const optionStyle =
@@ -20,7 +27,13 @@ const optionStyle =
  * We cannot know if the message was really sent: a messenger does not tell
  * us. So after any pick we only say "Sent? Great!".
  */
-export function ShareMenu({ path, text, buttonLabel, hint }: ShareMenuProps) {
+export function ShareMenu({
+  path,
+  text,
+  buttonLabel,
+  hint,
+  variant = "main",
+}: ShareMenuProps) {
   // The site address and the phone share menu exist only in the browser.
   const fullLink = useBrowserValue<string | null>(
     () => `${window.location.origin}${path}`,
@@ -72,7 +85,7 @@ export function ShareMenu({ path, text, buttonLabel, hint }: ShareMenuProps) {
         onClick={() => setIsOpen(!isOpen)}
         aria-expanded={isOpen}
         aria-controls={optionsId}
-        className="rounded-2xl bg-brand py-4 text-base font-semibold text-white"
+        className={BUTTON_STYLES[variant]}
       >
         {buttonLabel}
       </button>
