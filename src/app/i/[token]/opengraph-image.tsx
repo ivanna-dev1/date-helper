@@ -62,7 +62,9 @@ export default async function Image({
             textAlign: "center",
           }}
         >
-          <div style={{ fontSize: 96 }}>{card.emoji}</div>
+          {/* The emoji ends the heading line, like on the site.
+              A normal space, not a non-breaking one: with a non-breaking
+              space the emoji is drawn as an empty box. */}
           <div
             style={{
               fontSize: 60,
@@ -71,7 +73,7 @@ export default async function Image({
               lineHeight: 1.15,
             }}
           >
-            {card.title}
+            {card.title + " " + card.emoji}
           </div>
           {card.quote && (
             <div

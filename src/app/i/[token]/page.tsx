@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { InviteResponseForm } from "@/components/InviteResponseForm";
 import { ResponseSummary } from "@/components/ResponseSummary";
+import { AuthorPageLink } from "@/components/AuthorPageLink";
 import { InviteStatus } from "@/generated/prisma/enums";
 import { DATE_FORMATS } from "@/lib/dateFormats";
 import { getInviteCard, getInviteForCard } from "@/lib/inviteCard";
@@ -83,6 +84,9 @@ export default async function InvitePage(props: PageProps<"/i/[token]">) {
 
   const formatInfo = DATE_FORMATS[invite.format];
 
+  // Shown only in the author's own browser: it remembers their link.
+  const authorLink = <AuthorPageLink publicToken={token} />;
+
   // These parts never change, so they stay on the server.
   const header = (
     <>
@@ -114,6 +118,8 @@ export default async function InvitePage(props: PageProps<"/i/[token]">) {
           </h2>
           <p className="text-base text-muted">Maybe another time.</p>
         </section>
+
+        {authorLink}
       </main>
     );
   }
@@ -135,6 +141,8 @@ export default async function InvitePage(props: PageProps<"/i/[token]">) {
           path={`/i/${token}`}
           isJustSent={false}
         />
+
+        {authorLink}
       </main>
     );
   }
@@ -147,12 +155,13 @@ export default async function InvitePage(props: PageProps<"/i/[token]">) {
     return (
       <main className="flex flex-1 flex-col items-center justify-center gap-4 py-16 text-center">
         <h1 className="text-2xl font-bold text-ink">
-          This invitation has expired{" "}
-          <span aria-hidden="true">⌛</span>
+          This invitation has expired <span aria-hidden="true">⌛</span>
         </h1>
         <p className="text-base text-muted">
           {invite.authorName} can send you a new one.
         </p>
+
+        {authorLink}
       </main>
     );
   }
@@ -174,6 +183,8 @@ export default async function InvitePage(props: PageProps<"/i/[token]">) {
         }))}
         places={invite.placeOptions}
       />
+
+      {authorLink}
     </main>
   );
 }

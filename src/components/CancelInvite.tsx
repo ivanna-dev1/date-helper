@@ -33,7 +33,9 @@ export function CancelInvite({ secretToken }: CancelInviteProps) {
       <button
         type="button"
         onClick={() => setIsAsking(true)}
-        className="py-2 text-sm text-quiet"
+        // A real button with a border, like the other calm buttons:
+        // cancelling must be easy to find, but still not the loudest thing.
+        className="w-full rounded-xl border border-line py-3 text-sm font-medium text-muted"
       >
         Cancel invitation
       </button>

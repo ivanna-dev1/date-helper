@@ -6,6 +6,7 @@ import { ShareMenu } from "@/components/ShareMenu";
 import { LocalDateTime } from "@/components/LocalDateTime";
 import { AuthorAnswer } from "@/components/AuthorAnswer";
 import { CancelInvite } from "@/components/CancelInvite";
+import { RememberInvite } from "@/components/RememberInvite";
 import { InviteStatus } from "@/generated/prisma/enums";
 import { DATE_FORMATS } from "@/lib/dateFormats";
 import { RESPONSE_VIEW_SELECT, toSentAnswer } from "@/lib/responseView";
@@ -44,6 +45,15 @@ export default async function ManagePage(
 
   const formatInfo = DATE_FORMATS[invite.format];
 
+  // Writes the secret link into this browser, so the author can come back
+  // here even from the invited person's link.
+  const remember = (
+    <RememberInvite
+      publicToken={invite.publicToken}
+      secretToken={secretToken}
+    />
+  );
+
   const { response } = invite;
   const publicPath = `/i/${invite.publicToken}`;
 
@@ -53,6 +63,7 @@ export default async function ManagePage(
     const name = response?.respondentName;
     return (
       <main className="flex flex-1 flex-col items-center justify-center gap-6 py-16 text-center">
+        {remember}
         <div className="flex flex-col gap-2">
           <h1 className="text-2xl font-bold text-ink">
             Invitation cancelled{" "}
@@ -86,6 +97,7 @@ export default async function ManagePage(
   if (response) {
     return (
       <main className="flex flex-1 flex-col gap-6 py-10">
+        {remember}
         {/* The card below says what the answer is. The heading only
             reminds which invitation this page is about. */}
         <h1 className="text-center text-2xl font-bold text-ink">
@@ -116,6 +128,7 @@ export default async function ManagePage(
   if (invite.expiresAt < new Date()) {
     return (
       <main className="flex flex-1 flex-col items-center justify-center gap-4 py-16 text-center">
+        {remember}
         <h1 className="text-2xl font-bold text-ink">
           No answer this time{" "}
           <span aria-hidden="true">⌛</span>
@@ -135,6 +148,7 @@ export default async function ManagePage(
 
   return (
     <main className="flex flex-1 flex-col gap-6 py-10">
+      {remember}
       <div className="flex flex-col gap-2 text-center">
         <h1 className="text-2xl font-bold text-ink">
           Your invitation is ready{" "}
@@ -161,7 +175,8 @@ export default async function ManagePage(
         </h2>
         <p className="text-sm text-muted">
           {/* The date is shown in the reader's time zone. */}
-          The link works until <LocalDateTime value={invite.expiresAt.toISOString()} />
+          The link works until{" "}
+          <LocalDateTime value={invite.expiresAt.toISOString()} />
         </p>
       </section>
 
