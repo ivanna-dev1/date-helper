@@ -29,6 +29,9 @@ type ResponseSummaryProps = {
   // It goes into the shared address, so a messenger makes a fresh preview
   // for every move and does not show the old one from its memory.
   shareVersion?: string;
+  // true when this browser is the author's: the author opened the link
+  // they sent. Then there are no answer buttons, only a hint.
+  isAuthorBrowser?: boolean;
 };
 
 // Emoji and heading for each outcome. No hearts: a first date is often
@@ -105,6 +108,7 @@ export function ResponseSummary({
   turnToken,
   isJustSent,
   shareVersion,
+  isAuthorBrowser = false,
 }: ResponseSummaryProps) {
   const whoPaysText = getWhoPaysText(whoPays, authorName, guestName, "guest");
   const { outcome } = answer;
@@ -179,7 +183,13 @@ export function ResponseSummary({
         />
       )}
       {outcome === "authorSuggested" && (
-        <AnswerDetails answer={answer} ownNote="" whoPaysText={whoPaysText} />
+        <AnswerDetails
+          answer={answer}
+          ownNote=""
+          whoPaysText={whoPaysText}
+          // The choice cards below show the options.
+          hideChoices
+        />
       )}
 
       {!isAgreed && (
@@ -192,14 +202,18 @@ export function ResponseSummary({
       )}
 
       {/* The author suggested something back: now this person decides. */}
-      {outcome === "authorSuggested" && (
+      {outcome === "authorSuggested" && isAuthorBrowser && (
+        <p className="text-sm text-muted">
+          This is your suggestion — send this link to {guestName}.
+        </p>
+      )}
+      {outcome === "authorSuggested" && !isAuthorBrowser && (
         <TurnDecision
           turnKey={{ kind: "public", token }}
           viewer="guest"
-          currentTime={answer.time}
-          currentPlace={answer.place}
-          currentPlaceNote={answer.placeNote}
+          answer={answer}
           currentWhoPays={whoPays}
+          otherName={authorName}
         />
       )}
 

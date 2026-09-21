@@ -7,9 +7,11 @@ import { AuthorPageLink } from "@/components/AuthorPageLink";
 import { InviteStatus } from "@/generated/prisma/enums";
 import { DATE_FORMATS } from "@/lib/dateFormats";
 import { getInviteCard, getInviteForCard } from "@/lib/inviteCard";
+import { getBrowserRole } from "@/lib/browserRole";
 import {
   getLastWords,
   RESPONSE_VIEW_SELECT,
+  TURN_OPTIONS_SELECT,
   toSentAnswer,
 } from "@/lib/responseView";
 
@@ -86,6 +88,7 @@ export default async function InvitePage(props: PageProps<"/i/[token]">) {
       // The answer, if there is one, with the picked time and place.
       // Still the same one call: Prisma joins these rows for us.
       response: { select: RESPONSE_VIEW_SELECT },
+      ...TURN_OPTIONS_SELECT,
     },
   });
 
@@ -145,7 +148,12 @@ export default async function InvitePage(props: PageProps<"/i/[token]">) {
       <main className="flex flex-1 flex-col gap-6 py-10">
         {header}
         <ResponseSummary
-          answer={toSentAnswer(response, invite.status, invite.lastProposedBy)}
+          answer={toSentAnswer(
+            response,
+            invite.status,
+            invite.lastProposedBy,
+            invite,
+          )}
           authorName={invite.authorName}
           whoPays={invite.whoPays}
           friendToken={invite.friendToken}
@@ -159,6 +167,7 @@ export default async function InvitePage(props: PageProps<"/i/[token]">) {
           turnToken={invite.turnToken}
           isJustSent={false}
           shareVersion={invite.updatedAt.getTime().toString(36)}
+          isAuthorBrowser={(await getBrowserRole(token)) === "author"}
         />
 
         {authorLink}

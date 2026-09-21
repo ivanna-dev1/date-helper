@@ -86,6 +86,39 @@ model Invite {
   timeOptions  TimeOption[]
   placeOptions PlaceOption[]
   response     Response? // one invite gets at most one answer
+
+  // The options of the latest move in the back-and-forth ("Friday or
+  // Saturday?"). The other person picks one of them when accepting.
+  // A new move replaces them; accepting moves the picked ones into
+  // the response and removes the rows.
+  turnTimes  TurnTime[]
+  turnPlaces TurnPlace[]
+}
+
+// One time of the latest move. Like TimeOption, but it lives only
+// until the next move.
+model TurnTime {
+  id Int @id @default(autoincrement())
+
+  inviteId Int
+  invite   Invite @relation(fields: [inviteId], references: [id], onDelete: Cascade)
+
+  startsAt DateTime
+
+  @@index([inviteId])
+}
+
+// One place of the latest move, with its hint.
+model TurnPlace {
+  id Int @id @default(autoincrement())
+
+  inviteId Int
+  invite   Invite @relation(fields: [inviteId], references: [id], onDelete: Cascade)
+
+  name String
+  note String?
+
+  @@index([inviteId])
 }
 
 model TimeOption {

@@ -18,6 +18,11 @@ export type AnswerOutcome =
 // database: then it was the guest, because only the guest could suggest.
 export type Proposer = "author" | "guest";
 
+// One option of a move with a choice, in a form a client component can get.
+// The same shape as the author's first options, so the same cards show them.
+export type TurnTimeView = { id: number; startsAt: string }; // ISO string
+export type TurnPlaceView = { id: number; name: string; note: string | null };
+
 // An answer in a simple form, ready to show on the screen.
 // Only plain values, so it can go from the server to a client component.
 export type SentAnswer = {
@@ -28,6 +33,10 @@ export type SentAnswer = {
   placeNote: string | null; // the author's hint, "by the entrance"
   isOwnTime: boolean; // true when the person suggested their own time
   isOwnPlace: boolean;
+  // The latest move gave a choice ("Friday or Saturday?"): all its options.
+  // Then `time` and `place` are empty until the other person picks one.
+  // Null when the move is one time and one place.
+  choices: { times: TurnTimeView[]; places: TurnPlaceView[] } | null;
 };
 
 // The fields of an answer that both pages need.
@@ -42,6 +51,23 @@ export const RESPONSE_VIEW_SELECT = {
   chosenTime: { select: { startsAt: true } },
   chosenPlace: { select: { name: true, note: true } },
 } satisfies Prisma.ResponseSelect;
+
+// The options of the latest move. They live on the invitation, so the pages
+// add this to the invitation's select, next to the answer.
+export const TURN_OPTIONS_SELECT = {
+  turnTimes: {
+    select: { id: true, startsAt: true },
+    orderBy: { startsAt: "asc" },
+  },
+  turnPlaces: {
+    select: { id: true, name: true, note: true },
+    orderBy: { id: "asc" },
+  },
+} satisfies Prisma.InviteSelect;
+
+type StoredTurnOptions = Prisma.InviteGetPayload<{
+  select: typeof TURN_OPTIONS_SELECT;
+}>;
 
 // The type of one answer loaded with the select above.
 type StoredResponse = Prisma.ResponseGetPayload<{
@@ -72,25 +98,57 @@ export function toSentAnswer(
   response: StoredResponse,
   status: InviteStatus,
   lastProposedBy: Party | null = null,
+  turn: StoredTurnOptions | null = null,
 ): SentAnswer {
   const proposedBy = toProposer(lastProposedBy);
+  const outcome = getOutcome(response.type, status, proposedBy);
+
+  // A move in the back-and-forth keeps its options in their own rows.
+  // No note "(Max's idea)" for them: after a few moves it is not clear
+  // any more whose idea each part was.
+  const turnTimes = turn?.turnTimes ?? [];
+  const turnPlaces = turn?.turnPlaces ?? [];
+  if (turnTimes.length > 0 && turnPlaces.length > 0) {
+    const hasChoice = turnTimes.length > 1 || turnPlaces.length > 1;
+    const onlyTime = hasChoice ? null : turnTimes[0];
+    const onlyPlace = hasChoice ? null : turnPlaces[0];
+    return {
+      outcome,
+      proposedBy,
+      time: onlyTime ? onlyTime.startsAt.toISOString() : null,
+      place: onlyPlace?.name ?? null,
+      placeNote: onlyPlace?.note ?? null,
+      isOwnTime: false,
+      isOwnPlace: false,
+      choices: hasChoice
+        ? {
+            times: turnTimes.map((time) => ({
+              id: time.id,
+              startsAt: time.startsAt.toISOString(),
+            })),
+            places: turnPlaces,
+          }
+        : null,
+    };
+  }
+
   // An own value wins over a picked option, like when saving.
   const time = response.proposedTime ?? response.chosenTime?.startsAt;
   const place = response.proposedPlace ?? response.chosenPlace?.name;
 
   return {
-    outcome: getOutcome(response.type, status, proposedBy),
+    outcome,
     proposedBy,
     // Date objects become strings before going to the client.
     time: time ? time.toISOString() : null,
     place: place ?? null,
-    // An own place has no note: only the author writes notes.
     // An own place has its own hint; an author's option keeps the author's.
     placeNote: response.proposedPlace
       ? response.proposedPlaceNote
       : (response.chosenPlace?.note ?? null),
     isOwnTime: response.proposedTime !== null,
     isOwnPlace: response.proposedPlace !== null,
+    choices: null,
   };
 }
 

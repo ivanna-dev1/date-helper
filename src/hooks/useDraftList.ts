@@ -28,5 +28,11 @@ export function useDraftList<T extends Draft>(createDraft: () => T) {
     );
   }
 
-  return { items, add, remove, update };
+  // Puts a whole new list in place, for example to start from values
+  // that are already there. An empty list still gets one empty row.
+  function replace(nextItems: T[]) {
+    setItems(nextItems.length > 0 ? nextItems : [createDraft()]);
+  }
+
+  return { items, add, remove, update, replace };
 }

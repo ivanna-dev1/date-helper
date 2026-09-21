@@ -12,6 +12,7 @@ import { DATE_FORMATS } from "@/lib/dateFormats";
 import {
   getLastWords,
   RESPONSE_VIEW_SELECT,
+  TURN_OPTIONS_SELECT,
   toSentAnswer,
 } from "@/lib/responseView";
 
@@ -44,6 +45,7 @@ export default async function ManagePage(
       // The answer, if there is one. The same fields as on the invited
       // person's page, so both show the answer the same way.
       response: { select: RESPONSE_VIEW_SELECT },
+      ...TURN_OPTIONS_SELECT,
     },
   });
 
@@ -113,7 +115,12 @@ export default async function ManagePage(
           <span aria-hidden="true">{formatInfo.emoji}</span>
         </h1>
         <AuthorAnswer
-          answer={toSentAnswer(response, invite.status, invite.lastProposedBy)}
+          answer={toSentAnswer(
+            response,
+            invite.status,
+            invite.lastProposedBy,
+            invite,
+          )}
           respondentName={response.respondentName}
           authorName={invite.authorName}
           whoPays={invite.whoPays}

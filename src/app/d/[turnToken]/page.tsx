@@ -5,9 +5,11 @@ import { AuthorAnswer } from "@/components/AuthorAnswer";
 import { InviteStatus } from "@/generated/prisma/enums";
 import { DATE_FORMATS } from "@/lib/dateFormats";
 import { getInviteCard, getInviteForCard } from "@/lib/inviteCard";
+import { getBrowserRole } from "@/lib/browserRole";
 import {
   getLastWords,
   RESPONSE_VIEW_SELECT,
+  TURN_OPTIONS_SELECT,
   toSentAnswer,
 } from "@/lib/responseView";
 
@@ -31,6 +33,7 @@ async function findByTurn(turnToken: string) {
       turnMessage: true,
       lastMessageBy: true,
       response: { select: RESPONSE_VIEW_SELECT },
+      ...TURN_OPTIONS_SELECT,
     },
   });
 }
@@ -101,7 +104,12 @@ export default async function TurnPage(props: PageProps<"/d/[turnToken]">) {
         <span aria-hidden="true">{formatInfo.emoji}</span>
       </h1>
       <AuthorAnswer
-        answer={toSentAnswer(response, invite.status, invite.lastProposedBy)}
+        answer={toSentAnswer(
+          response,
+          invite.status,
+          invite.lastProposedBy,
+          invite,
+        )}
         respondentName={response.respondentName}
         authorName={invite.authorName}
         whoPays={invite.whoPays}
@@ -114,6 +122,7 @@ export default async function TurnPage(props: PageProps<"/d/[turnToken]">) {
         friendToken={invite.friendToken}
         publicPath={`/i/${invite.publicToken}`}
         shareVersion={invite.updatedAt.getTime().toString(36)}
+        isGuestBrowser={(await getBrowserRole(invite.publicToken)) === "guest"}
       />
     </main>
   );

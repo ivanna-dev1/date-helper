@@ -4,8 +4,11 @@ import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { createToken } from "@/lib/tokens";
+import { getBrowserRole, rememberBrowserRole } from "@/lib/browserRole";
 import {
   isZonedTime,
+  MAX_PLACE_OPTIONS,
+  MAX_TIME_OPTIONS,
   PLACE_NAME_MAX_LENGTH,
   PLACE_NOTE_MAX_LENGTH,
   RESPONSE_MESSAGE_MAX_LENGTH,
@@ -71,6 +74,10 @@ export async function createInvite(
     },
   });
 
+  // This browser is the author's now: it must not answer this invitation
+  // as the invited person by mistake.
+  await rememberBrowserRole(invite.publicToken, "author");
+
   // redirect() throws a special error that Next.js catches.
   // Code after this line never runs.
   redirect(`/manage/${invite.secretToken}`);
@@ -122,6 +129,16 @@ export async function submitResponse(
 
   if (invite.status === InviteStatus.CANCELLED) {
     return { ok: false, errors: { form: CANCELLED_MESSAGE } };
+  }
+
+  // The author opened their own link, for example to see how it looks.
+  if ((await getBrowserRole(input.token)) === "author") {
+    return {
+      ok: false,
+      errors: {
+        form: "This is your own invitation — send the link to the person you're inviting",
+      },
+    };
   }
 
   // The page already hides the form for an old invitation,
@@ -219,6 +236,7 @@ export async function submitResponse(
     throw error;
   }
 
+  await rememberBrowserRole(input.token, "guest");
   return { ok: true, turnToken };
 }
 
@@ -233,12 +251,15 @@ export type TurnKey =
 export type TurnInput = {
   key: TurnKey;
   decision: "accept" | "decline" | "counter";
-  // Only for "counter": the new time (UTC with a zone), place, its hint,
-  // and who pays (left out = keep as it is).
-  proposedTime?: string;
-  proposedPlace?: string;
-  proposedPlaceNote?: string;
+  // Only for "counter": the new times (UTC with a zone) and places with
+  // their hints — one or more of each, so the other person can pick.
+  // Who pays: left out = keep as it is.
+  proposedTimes?: string[];
+  proposedPlaces?: { name: string; note: string }[];
   whoPays?: WhoPays | null;
+  // Only for "accept" of a move with a choice: the picked options.
+  timeId?: number | null;
+  placeId?: number | null;
   // A few words with any move. Only the latest words are kept.
   message?: string;
 };
@@ -254,13 +275,111 @@ function whereByKey(key: TurnKey) {
   return { publicToken: key.token };
 }
 
+type NewPlace = { name: string; note: string };
+
+// Checks the options of a new move. Returns an error text, or null.
+function checkTurnOptions(times: string[], places: NewPlace[]): string | null {
+  if (times.length === 0) return "Add a time";
+  if (times.length > MAX_TIME_OPTIONS) {
+    return `No more than ${MAX_TIME_OPTIONS} times`;
+  }
+  if (times.some((time) => !isZonedTime(time))) {
+    return "Pick a real date and time";
+  }
+  if (times.some((time) => new Date(time) < new Date())) {
+    return "The time cannot be in the past";
+  }
+  if (places.length === 0) return "Add a place";
+  if (places.length > MAX_PLACE_OPTIONS) {
+    return `No more than ${MAX_PLACE_OPTIONS} places`;
+  }
+  if (places.some((place) => place.name.length > PLACE_NAME_MAX_LENGTH)) {
+    return `Keep the place under ${PLACE_NAME_MAX_LENGTH} characters`;
+  }
+  if (places.some((place) => place.note.length > PLACE_NOTE_MAX_LENGTH)) {
+    return `Keep the hint under ${PLACE_NOTE_MAX_LENGTH} characters`;
+  }
+  return null;
+}
+
+// A list of options as one string, in a fixed order, so two lists can be
+// compared: "the same as on the table" does not depend on the order.
+function timesKey(times: Date[]): string {
+  return times
+    .map((time) => time.getTime())
+    .sort()
+    .join(",");
+}
+function placeKey(place: { name: string; note: string | null }): string {
+  return `${place.name.toLowerCase()}|${place.note ?? ""}`;
+}
+function placesKey(places: { name: string; note: string | null }[]): string {
+  return places.map(placeKey).sort().join(",");
+}
+
+// The data of the invitation that a move needs, loaded inside the move's
+// transaction.
+const TURN_TARGET_SELECT = {
+  id: true,
+  whoPays: true,
+  timeOptions: { select: { id: true, startsAt: true } },
+  placeOptions: { select: { id: true, name: true, note: true } },
+  turnTimes: { select: { id: true, startsAt: true } },
+  turnPlaces: { select: { id: true, name: true, note: true } },
+  response: {
+    select: {
+      proposedTime: true,
+      proposedPlace: true,
+      proposedPlaceNote: true,
+      chosenTime: { select: { startsAt: true } },
+      chosenPlace: { select: { name: true, note: true } },
+    },
+  },
+} satisfies Prisma.InviteSelect;
+
+type TurnTarget = Prisma.InviteGetPayload<{
+  select: typeof TURN_TARGET_SELECT;
+}>;
+
+// The agreed time and place, written into the answer. One of the author's
+// first options? Then we link it, not copy its text: the author's hint
+// ("by the entrance") stays with the place.
+function toAgreedData(
+  target: TurnTarget,
+  time: Date,
+  place: { name: string; note: string | null },
+) {
+  const note = place.note ?? "";
+  const timeOption = target.timeOptions.find(
+    (option) => option.startsAt.getTime() === time.getTime(),
+  );
+  // Only when the hint is the author's too (or empty): a new hint makes
+  // it the person's own place.
+  const placeOption = target.placeOptions.find(
+    (option) =>
+      option.name.toLowerCase() === place.name.toLowerCase() &&
+      (note === "" || note === (option.note ?? "")),
+  );
+  return {
+    proposedTime: timeOption ? null : time,
+    proposedPlace: placeOption ? null : place.name,
+    proposedPlaceNote: placeOption ? null : note || null,
+    chosenTime: timeOption
+      ? { connect: { id: timeOption.id } }
+      : { disconnect: true },
+    chosenPlace: placeOption
+      ? { connect: { id: placeOption.id } }
+      : { disconnect: true },
+  };
+}
+
 /**
  * One move in the back-and-forth: accept, decline, or suggest something else.
  *
  * Only the person who did NOT make the latest suggestion may answer it.
  * The check and the change happen in one conditional update, so two
  * clicks at the same moment (two phones) cannot both win.
- * Only the latest suggestion is kept: a new one overwrites the old one.
+ * Only the latest suggestion is kept: a new one replaces the old one.
  */
 export async function answerTurn(input: TurnInput): Promise<TurnResult> {
   const actor = input.key.kind === "public" ? Party.GUEST : Party.AUTHOR;
@@ -278,6 +397,37 @@ export async function answerTurn(input: TurnInput): Promise<TurnResult> {
     ...madeByOther,
   };
 
+  // The browser's side of this date. The secret link is the author's
+  // own page and proves the side by itself, so it is not checked.
+  const role = actor === Party.GUEST ? "guest" : "author";
+  const people =
+    input.key.kind === "secret"
+      ? null
+      : await prisma.invite.findFirst({
+          where: whereByKey(input.key),
+          select: {
+            publicToken: true,
+            authorName: true,
+            response: { select: { respondentName: true } },
+          },
+        });
+  if (people) {
+    const browserRole = await getBrowserRole(people.publicToken);
+    if (browserRole !== null && browserRole !== role) {
+      // The other person's name: the one this link must go to.
+      const other =
+        role === "guest" ? people.response?.respondentName : people.authorName;
+      return {
+        ok: false,
+        error: `This is your own suggestion — send this link to ${other ?? "them"}`,
+      };
+    }
+  }
+  // Called after a move is saved.
+  async function rememberRole() {
+    if (people) await rememberBrowserRole(people.publicToken, role);
+  }
+
   // The words go with the move and replace the ones before. lastMessageBy is
   // set even without words: it marks that the talk moved on, so older words
   // (for example from the first answer) are not shown as the latest.
@@ -290,49 +440,85 @@ export async function answerTurn(input: TurnInput): Promise<TurnResult> {
   }
   const messageData = { turnMessage: message || null, lastMessageBy: actor };
 
-  if (input.decision !== "counter") {
+  if (input.decision === "decline") {
     const { count } = await prisma.invite.updateMany({
       where,
-      data: {
-        status:
-          input.decision === "accept"
-            ? InviteStatus.CONFIRMED
-            : InviteStatus.DECLINED,
-        ...messageData,
-      },
+      data: { status: InviteStatus.DECLINED, ...messageData },
     });
     // Show the fresh state in any case: if nothing changed, the page was old.
     refresh();
-    return count === 0
-      ? { ok: false, error: TURN_TAKEN }
-      : { ok: true, turnToken: null };
+    if (count === 0) return { ok: false, error: TURN_TAKEN };
+    await rememberRole();
+    return { ok: true, turnToken: null };
   }
 
-  // A new suggestion: check it like any other suggestion.
-  const proposedTime = input.proposedTime ?? "";
-  const proposedPlace = (input.proposedPlace ?? "").trim();
-  if (!isZonedTime(proposedTime)) {
-    return { ok: false, error: "Pick a real date and time" };
-  }
-  if (new Date(proposedTime) < new Date()) {
-    return { ok: false, error: "The time cannot be in the past" };
-  }
-  if (proposedPlace === "") {
-    return { ok: false, error: "Add a place" };
-  }
-  if (proposedPlace.length > PLACE_NAME_MAX_LENGTH) {
-    return {
-      ok: false,
-      error: `Keep the place under ${PLACE_NAME_MAX_LENGTH} characters`,
-    };
+  if (input.decision === "accept") {
+    // A move with options: the picked ones become the plan. The status,
+    // the plan and the removal of the options happen together.
+    const result = await prisma.$transaction(async (tx) => {
+      const target = await tx.invite.findFirst({
+        where,
+        select: TURN_TARGET_SELECT,
+      });
+      if (!target) return null;
+
+      const { turnTimes, turnPlaces } = target;
+      // Old invitations in the middle of a talk have no option rows: then
+      // the plan is already in the answer, and only the status changes.
+      const hasOptions = turnTimes.length > 0 && turnPlaces.length > 0;
+      // One option is picked by itself; from several, the person picks.
+      const time =
+        turnTimes.length === 1
+          ? turnTimes[0]
+          : turnTimes.find((option) => option.id === input.timeId);
+      const place =
+        turnPlaces.length === 1
+          ? turnPlaces[0]
+          : turnPlaces.find((option) => option.id === input.placeId);
+      if (hasOptions && !time) return "pickTime" as const;
+      if (hasOptions && !place) return "pickPlace" as const;
+
+      const { count } = await tx.invite.updateMany({
+        where: { id: target.id, ...where },
+        data: { status: InviteStatus.CONFIRMED, ...messageData },
+      });
+      if (count === 0) return null;
+
+      if (time && place) {
+        await tx.response.update({
+          where: { inviteId: target.id },
+          data: toAgreedData(target, time.startsAt, place),
+        });
+        await tx.turnTime.deleteMany({ where: { inviteId: target.id } });
+        await tx.turnPlace.deleteMany({ where: { inviteId: target.id } });
+      }
+      return "ok" as const;
+    });
+
+    refresh();
+    if (result === "pickTime") return { ok: false, error: "Pick a time" };
+    if (result === "pickPlace") return { ok: false, error: "Pick a place" };
+    if (result === null) return { ok: false, error: TURN_TAKEN };
+    await rememberRole();
+    return { ok: true, turnToken: null };
   }
 
-  const proposedPlaceNote = (input.proposedPlaceNote ?? "").trim();
-  if (proposedPlaceNote.length > PLACE_NOTE_MAX_LENGTH) {
-    return {
-      ok: false,
-      error: `Keep the hint under ${PLACE_NOTE_MAX_LENGTH} characters`,
-    };
+  // A new suggestion: check it like any other suggestion. Empty rows are
+  // dropped, and the same time or place twice counts once.
+  const times = [
+    ...new Set((input.proposedTimes ?? []).filter((time) => time !== "")),
+  ];
+  const places = (input.proposedPlaces ?? [])
+    .map((place) => ({ name: place.name.trim(), note: place.note.trim() }))
+    .filter((place) => place.name !== "")
+    .filter(
+      (place, index, list) =>
+        list.findIndex((other) => placeKey(other) === placeKey(place)) ===
+        index,
+    );
+  const optionsError = checkTurnOptions(times, places);
+  if (optionsError) {
+    return { ok: false, error: optionsError };
   }
   if (
     input.whoPays !== undefined &&
@@ -342,66 +528,53 @@ export async function answerTurn(input: TurnInput): Promise<TurnResult> {
     return { ok: false, error: "Unknown option for who pays" };
   }
 
-  const newTime = new Date(proposedTime);
+  const newTimes = times.map((time) => new Date(time));
 
   // The author's turn link stays the same when the author moves (it is
   // their door). A new guest move gives the author a fresh link.
   const newTurnToken = actor === Party.GUEST ? createToken() : null;
 
-  // Two writes (the invite and its answer) that must happen together,
-  // so they run in one transaction: both, or none.
+  // Several writes that must happen together, so they run in one
+  // transaction: all, or none.
   const invite = await prisma.$transaction(async (tx) => {
     const target = await tx.invite.findFirst({
       where,
-      select: {
-        id: true,
-        whoPays: true,
-        timeOptions: { select: { id: true, startsAt: true } },
-        placeOptions: { select: { id: true, name: true, note: true } },
-        response: {
-          select: {
-            proposedTime: true,
-            proposedPlace: true,
-            proposedPlaceNote: true,
-            chosenTime: { select: { startsAt: true } },
-            chosenPlace: { select: { name: true, note: true } },
-          },
-        },
-      },
+      select: TURN_TARGET_SELECT,
     });
     if (!target || !target.response) return null;
 
-    // The same time and place as now is not a new suggestion:
-    // for that there is "Accept".
+    // What is on the table now: the options of the latest move, or, before
+    // any move, the first suggestion from the answer.
     const current = target.response;
+    const hasOptions =
+      target.turnTimes.length > 0 && target.turnPlaces.length > 0;
     const currentTime = current.proposedTime ?? current.chosenTime?.startsAt;
     const currentPlace = current.proposedPlace ?? current.chosenPlace?.name;
     const currentNote = current.proposedPlace
       ? current.proposedPlaceNote
       : current.chosenPlace?.note;
+    const currentTimes = hasOptions
+      ? target.turnTimes.map((option) => option.startsAt)
+      : currentTime
+        ? [currentTime]
+        : [];
+    const currentPlaces = hasOptions
+      ? target.turnPlaces
+      : currentPlace
+        ? [{ name: currentPlace, note: currentNote ?? null }]
+        : [];
+
+    // The same options as now are not a new suggestion:
+    // for that there is "Accept".
     const newWhoPays =
       input.whoPays === undefined ? target.whoPays : input.whoPays;
     if (
-      currentTime?.getTime() === newTime.getTime() &&
-      currentPlace?.toLowerCase() === proposedPlace.toLowerCase() &&
-      (currentNote ?? "") === proposedPlaceNote &&
+      timesKey(currentTimes) === timesKey(newTimes) &&
+      placesKey(currentPlaces) === placesKey(places) &&
       target.whoPays === newWhoPays
     ) {
       return "same" as const;
     }
-
-    // One of the author's first options again? Then we link it, not copy
-    // its text: the author's hint ("by the entrance") stays with the place.
-    const timeOption = target.timeOptions.find(
-      (option) => option.startsAt.getTime() === newTime.getTime(),
-    );
-    // Only when the hint is the author's too (or empty): a new hint makes
-    // it the person's own place.
-    const placeOption = target.placeOptions.find(
-      (option) =>
-        option.name.toLowerCase() === proposedPlace.toLowerCase() &&
-        (proposedPlaceNote === "" || proposedPlaceNote === (option.note ?? "")),
-    );
 
     const { count } = await tx.invite.updateMany({
       where: { id: target.id, ...where },
@@ -414,18 +587,28 @@ export async function answerTurn(input: TurnInput): Promise<TurnResult> {
     });
     if (count === 0) return null;
 
+    // The new options replace the old ones. The answer's own values are
+    // cleared: from now on the options say what is on the table.
+    await tx.turnTime.deleteMany({ where: { inviteId: target.id } });
+    await tx.turnPlace.deleteMany({ where: { inviteId: target.id } });
+    await tx.turnTime.createMany({
+      data: newTimes.map((startsAt) => ({ inviteId: target.id, startsAt })),
+    });
+    await tx.turnPlace.createMany({
+      data: places.map((place) => ({
+        inviteId: target.id,
+        name: place.name,
+        note: place.note || null,
+      })),
+    });
     await tx.response.update({
       where: { inviteId: target.id },
       data: {
-        proposedTime: timeOption ? null : newTime,
-        proposedPlace: placeOption ? null : proposedPlace,
-        proposedPlaceNote: placeOption ? null : proposedPlaceNote || null,
-        chosenTime: timeOption
-          ? { connect: { id: timeOption.id } }
-          : { disconnect: true },
-        chosenPlace: placeOption
-          ? { connect: { id: placeOption.id } }
-          : { disconnect: true },
+        proposedTime: null,
+        proposedPlace: null,
+        proposedPlaceNote: null,
+        chosenTime: { disconnect: true },
+        chosenPlace: { disconnect: true },
       },
     });
     return target;
@@ -440,6 +623,7 @@ export async function answerTurn(input: TurnInput): Promise<TurnResult> {
 
   refresh();
   if (!invite) return { ok: false, error: TURN_TAKEN };
+  await rememberRole();
   return { ok: true, turnToken: newTurnToken };
 }
 

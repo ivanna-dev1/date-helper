@@ -28,38 +28,49 @@ export function getWhoPaysText(
 }
 
 // The same choice seen from the person who is choosing: "me" is always
-// "I pay", whoever I am. There is no "you pay" on purpose: asking the other
-// person to pay feels rude on a date — "Decide later" covers that.
-export type PayChoice = "me" | "split" | "later" | null;
+// "I pay", whoever I am. "other" is the other person's own offer to pay
+// ("Olia's treat"). It is a chip only when that person offered it: asking
+// the other person to pay feels rude on a date — "Decide later" covers that.
+export type PayChoice = "me" | "other" | "split" | "later" | null;
 
 export function toWhoPays(choice: PayChoice, viewer: Viewer): WhoPays | null {
   if (choice === "me") {
     return viewer === "author" ? WhoPays.MY_TREAT : WhoPays.GUEST_TREAT;
+  }
+  if (choice === "other") {
+    return viewer === "author" ? WhoPays.GUEST_TREAT : WhoPays.MY_TREAT;
   }
   if (choice === "split") return WhoPays.SPLIT;
   if (choice === "later") return WhoPays.DECIDE_LATER;
   return null;
 }
 
-// The other person's "My treat" is not a chip for this viewer, so it shows
-// as nothing picked. The forms send who pays only after a click on a chip,
-// so it is not wiped by someone who only changes the place.
+// The forms send who pays only after a click on a chip, so it is not wiped
+// by someone who only changes the place.
 export function toPayChoice(
   whoPays: WhoPays | null,
   viewer: Viewer,
 ): PayChoice {
   if (whoPays === WhoPays.SPLIT) return "split";
   if (whoPays === WhoPays.DECIDE_LATER) return "later";
-  if (whoPays === WhoPays.MY_TREAT && viewer === "author") return "me";
-  if (whoPays === WhoPays.GUEST_TREAT && viewer === "guest") return "me";
+  if (whoPays === WhoPays.MY_TREAT) return viewer === "author" ? "me" : "other";
+  if (whoPays === WhoPays.GUEST_TREAT)
+    return viewer === "guest" ? "me" : "other";
   return null;
 }
 
 // The chips, in the order people see them. A click on the picked one
-// clears it: not choosing is fine too.
-export const PAY_CHOICES: { value: Exclude<PayChoice, null>; label: string }[] =
-  [
+// clears it: not choosing is fine too. `otherName` adds the other person's
+// offer ("Olia's treat") — only when they offered it themselves.
+export function getPayChoices(
+  otherName: string | null,
+): { value: Exclude<PayChoice, null>; label: string }[] {
+  return [
+    ...(otherName
+      ? [{ value: "other" as const, label: `${otherName}'s treat` }]
+      : []),
     { value: "me", label: "My treat" },
     { value: "split", label: "Split it" },
     { value: "later", label: "Decide later" },
   ];
+}

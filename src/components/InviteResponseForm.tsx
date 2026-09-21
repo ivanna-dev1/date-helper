@@ -22,7 +22,12 @@ import { toUtcString } from "@/lib/time";
 import { ResponseSummary } from "@/components/ResponseSummary";
 import { getOutcome, type SentAnswer } from "@/lib/responseView";
 import { PayChips } from "@/components/PayChips";
-import { toPayChoice, toWhoPays, type PayChoice } from "@/lib/whoPays";
+import {
+  getWhoPaysText,
+  toPayChoice,
+  toWhoPays,
+  type PayChoice,
+} from "@/lib/whoPays";
 
 // Three ways to answer. The mode decides what the form shows.
 // "yes"     — pick a time and a place from the author's options
@@ -74,6 +79,9 @@ export function InviteResponseForm({
   places,
 }: InviteResponseFormProps) {
   const [mode, setMode] = useState<Mode>("yes");
+  // The invited person has no name here yet, and only the author could
+  // have chosen, so the guest's name is never needed.
+  const whoPaysText = getWhoPaysText(whoPays, authorName, "", "guest");
 
   // When there is only one option, there is nothing to choose: it is
   // picked from the start, so "Works for me!" is the only click needed.
@@ -87,7 +95,7 @@ export function InviteResponseForm({
   const [otherPlace, setOtherPlace] = useState("");
   const [otherPlaceNote, setOtherPlaceNote] = useState("");
   // Who pays, from this person's side. Starts with the author's choice,
-  // so "Olia is treating" shows as "Your treat".
+  // so "Olia is treating" shows as the picked "Olia's treat" chip.
   const [payChoice, setPayChoice] = useState<PayChoice>(
     toPayChoice(whoPays, "guest"),
   );
@@ -181,6 +189,7 @@ export function InviteResponseForm({
             : (places.find((place) => place.id === placeId)?.note ?? null),
           isOwnTime: proposedTime !== null,
           isOwnPlace: proposedPlace !== null,
+          choices: null,
         });
       } else {
         setErrors(result.errors);
@@ -237,10 +246,19 @@ export function InviteResponseForm({
         </p>
       )}
 
+      {/* The author's choice about the bill, as on the plan later.
+          In the suggestion mode the chips show it instead. */}
+      {mode === "yes" && whoPaysText && (
+        <p className="-mt-2 text-sm italic text-muted">{whoPaysText}</p>
+      )}
+
       {/* A suggestion may also say who pays: "My treat" — "no, my treat". */}
       {mode === "counter" && (
         <PayChips
           value={payChoice}
+          offeredBy={
+            toPayChoice(whoPays, "guest") === "other" ? authorName : null
+          }
           onChange={(value) => {
             setPayChoice(value);
             setIsPayTouched(true);

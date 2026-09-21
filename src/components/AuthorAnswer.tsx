@@ -21,6 +21,9 @@ type AuthorAnswerProps = {
   publicPath: string; // the invited person's link, "/i/k7Fq2mXp9RtA"
   // Changes with every move, so a messenger makes a fresh preview each time.
   shareVersion: string;
+  // true when this browser is the invited person's: they opened the turn
+  // link they sent. Then there are no answer buttons, only a hint.
+  isGuestBrowser?: boolean;
 };
 
 // What the author sees for each outcome. No hearts, like elsewhere.
@@ -78,6 +81,7 @@ export function AuthorAnswer({
   friendToken,
   publicPath,
   shareVersion,
+  isGuestBrowser = false,
 }: AuthorAnswerProps) {
   const { outcome } = answer;
   const byGuest = answer.proposedBy === "guest";
@@ -153,6 +157,8 @@ export function AuthorAnswer({
           answer={answer}
           ownNote={`(${respondentName}'s idea)`}
           whoPaysText={whoPaysText}
+          // The choice cards below show the options.
+          hideChoices
         />
       )}
       {outcome === "authorSuggested" && (
@@ -168,14 +174,18 @@ export function AuthorAnswer({
         />
       )}
 
-      {outcome === "suggested" && (
+      {outcome === "suggested" && isGuestBrowser && (
+        <p className="text-sm text-muted">
+          This is your suggestion — send this link to {authorName}.
+        </p>
+      )}
+      {outcome === "suggested" && !isGuestBrowser && (
         <TurnDecision
           turnKey={turnKey}
           viewer="author"
-          currentTime={answer.time}
-          currentPlace={answer.place}
-          currentPlaceNote={answer.placeNote}
+          answer={answer}
           currentWhoPays={whoPays}
+          otherName={respondentName}
         />
       )}
 
