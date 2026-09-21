@@ -2,6 +2,7 @@ import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import {
   InviteStatus,
+  Party,
   ResponseType,
   type DateFormat,
 } from "@/generated/prisma/enums";
@@ -32,6 +33,7 @@ export const getInviteForCard = cache(async (publicToken: string) => {
       format: true,
       status: true,
       expiresAt: true,
+      lastProposedBy: true,
       response: { select: { type: true, respondentName: true } },
     },
   });
@@ -43,6 +45,7 @@ type CardInput = {
   format: DateFormat;
   status: InviteStatus;
   expiresAt: Date;
+  lastProposedBy: Party | null;
   response: { type: ResponseType; respondentName: string } | null;
 };
 
@@ -73,18 +76,25 @@ export function getInviteCard(invite: CardInput): InviteCard {
       quote: null,
     };
   }
+  // Who made the latest suggestion: the other person answers it.
+  // Old invitations have no value: then it was the guest.
+  const byAuthor = invite.lastProposedBy === Party.AUTHOR;
+
   if (invite.status === InviteStatus.COUNTER && guest) {
     return {
-      tag: "counter",
+      // The proposer is in the tag too: a new move needs a new picture.
+      tag: byAuthor ? "counter-author" : "counter",
       emoji: "📨",
-      title: `${guest} suggested another option`,
-      subtitle: `Waiting for ${author} to answer`,
+      title: `${byAuthor ? author : guest} suggested another option`,
+      subtitle: `Waiting for ${byAuthor ? guest : author} to answer`,
       quote: null,
     };
   }
   if (invite.status === InviteStatus.DECLINED && guest) {
-    // Both "no" from the guest and "no" from the author end here.
-    const byGuest = invite.response?.type === ResponseType.NO;
+    // Who said no: the guest to the invitation, or whoever answered
+    // the latest suggestion (the one who did not make it).
+    const byGuest =
+      invite.response?.type === ResponseType.NO || byAuthor;
     return {
       tag: "no",
       emoji: "🌷",

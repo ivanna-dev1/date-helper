@@ -60,10 +60,15 @@ export default async function InvitePage(props: PageProps<"/i/[token]">) {
       authorName: true,
       whoPays: true,
       friendToken: true,
+      // The author's turn link: the invited person sends it after a
+      // suggestion. Both fields are empty on old invitations.
+      turnToken: true,
+      lastProposedBy: true,
       message: true,
       format: true,
       expiresAt: true,
       status: true,
+      updatedAt: true,
       timeOptions: {
         select: { id: true, startsAt: true },
         orderBy: { startsAt: "asc" },
@@ -134,12 +139,14 @@ export default async function InvitePage(props: PageProps<"/i/[token]">) {
       <main className="flex flex-1 flex-col gap-6 py-10">
         {header}
         <ResponseSummary
-          answer={toSentAnswer(response, invite.status)}
+          answer={toSentAnswer(response, invite.status, invite.lastProposedBy)}
           authorName={invite.authorName}
           whoPays={invite.whoPays}
           friendToken={invite.friendToken}
-          path={`/i/${token}`}
+          token={token}
+          turnToken={invite.turnToken}
           isJustSent={false}
+          shareVersion={invite.updatedAt.getTime().toString(36)}
         />
 
         {authorLink}

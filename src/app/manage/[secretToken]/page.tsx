@@ -33,6 +33,8 @@ export default async function ManagePage(
       format: true,
       expiresAt: true,
       status: true,
+      updatedAt: true,
+      lastProposedBy: true,
       // The answer, if there is one. The same fields as on the invited
       // person's page, so both show the answer the same way.
       response: { select: RESPONSE_VIEW_SELECT },
@@ -105,14 +107,15 @@ export default async function ManagePage(
           <span aria-hidden="true">{formatInfo.emoji}</span>
         </h1>
         <AuthorAnswer
-          answer={toSentAnswer(response, invite.status)}
+          answer={toSentAnswer(response, invite.status, invite.lastProposedBy)}
           respondentName={response.respondentName}
           authorName={invite.authorName}
           whoPays={invite.whoPays}
           message={response.message}
-          secretToken={secretToken}
+          turnKey={{ kind: "secret", token: secretToken }}
           friendToken={invite.friendToken}
           publicPath={publicPath}
+          shareVersion={invite.updatedAt.getTime().toString(36)}
         />
         {/* After "no" (the first answer or the author's) there is
             nothing to cancel. */}

@@ -1,10 +1,11 @@
 import Link from "next/link";
 import type { WhoPays } from "@/generated/prisma/enums";
+import type { TurnKey } from "@/app/actions";
 import { AnswerDetails } from "@/components/AnswerDetails";
 import { DatePlan } from "@/components/DatePlan";
 import { getWhoPaysText } from "@/lib/whoPays";
 import { ShareMenu } from "@/components/ShareMenu";
-import { SuggestionDecision } from "@/components/SuggestionDecision";
+import { TurnDecision } from "@/components/TurnDecision";
 import type { AnswerOutcome, SentAnswer } from "@/lib/responseView";
 
 type AuthorAnswerProps = {
@@ -13,15 +14,19 @@ type AuthorAnswerProps = {
   authorName: string;
   whoPays: WhoPays | null;
   message: string | null; // the invited person's few words, if any
-  secretToken: string; // for the accept / decline buttons
+  // The author's key for answering: the secret link or the turn link.
+  turnKey: TurnKey;
   friendToken: string; // for "Let a friend know where I am"
   publicPath: string; // the invited person's link, "/i/k7Fq2mXp9RtA"
+  // Changes with every move, so a messenger makes a fresh preview each time.
+  shareVersion: string;
 };
 
 // What the author sees for each outcome. No hearts, like elsewhere.
+// `byGuest` tells who made the latest suggestion.
 const HEADINGS: Record<
   AnswerOutcome,
-  { emoji: string; title: (name: string) => string }
+  { emoji: string; title: (name: string, byGuest: boolean) => string }
 > = {
   // An agreed date has the same heading for both people.
   yes: { emoji: "🎉", title: () => "It's a date!" },
@@ -30,41 +35,70 @@ const HEADINGS: Record<
     emoji: "📨",
     title: (name) => `${name} suggested another option`,
   },
+  authorSuggested: {
+    emoji: "📨",
+    title: () => "You suggested another option",
+  },
   suggestionAccepted: { emoji: "🎉", title: () => "It's a date!" },
   suggestionDeclined: {
     emoji: "🌷",
-    title: (name) => `You declined ${name}'s suggestion`,
+    title: (name, byGuest) =>
+      byGuest
+        ? `You declined ${name}'s suggestion`
+        : `${name} can't make it this time`,
   },
 };
 
-// After the author decides, the invited person does not know it yet.
-// The author tells them the same way: a message with the same link.
-const SHARE_TEXTS: Partial<Record<AnswerOutcome, string>> = {
-  suggestionAccepted: "I said yes to your suggestion! 🎉",
-  suggestionDeclined: "Sorry, your suggestion doesn't work for me 🌷",
-};
+// The invited person does not know the author's move yet. The author tells
+// them the same way: a message with the invited person's own link.
+function getShareText(outcome: AnswerOutcome, byGuest: boolean) {
+  if (outcome === "authorSuggested") {
+    return "I suggested another option — what do you say? 📨";
+  }
+  // Only the author's own decision is news for the invited person.
+  if (!byGuest) return undefined;
+  if (outcome === "suggestionAccepted") {
+    return "I said yes to your suggestion! 🎉";
+  }
+  if (outcome === "suggestionDeclined") {
+    return "Sorry, your suggestion doesn't work for me 🌷";
+  }
+  return undefined;
+}
 
-// The answer, shown on the author's page.
+// The answer, shown on the author's page (and on the author's turn link).
 export function AuthorAnswer({
   answer,
   respondentName,
   authorName,
   whoPays,
   message,
-  secretToken,
+  turnKey,
   friendToken,
   publicPath,
+  shareVersion,
 }: AuthorAnswerProps) {
   const { outcome } = answer;
+  const byGuest = answer.proposedBy === "guest";
   const heading = HEADINGS[outcome];
-  const shareText = SHARE_TEXTS[outcome];
+  const shareText = getShareText(outcome, byGuest);
   const isNo = outcome === "no" || outcome === "suggestionDeclined";
   const isAgreed = outcome === "yes" || outcome === "suggestionAccepted";
+
+  // The tag changes the address, so the messenger loads a fresh preview
+  // instead of the one it remembered for this link.
+  const shareMenu = shareText ? (
+    <ShareMenu
+      path={`${publicPath}?s=${outcome}-${shareVersion}`}
+      text={shareText}
+      buttonLabel={`Let ${respondentName} know`}
+    />
+  ) : null;
 
   return (
     <section className="flex flex-col items-center gap-6 rounded-2xl border border-line bg-surface px-5 py-8 text-center">
       <h2 className="text-2xl font-bold text-ink">
-        {heading.title(respondentName)}
+        {heading.title(respondentName, byGuest)}
         {/* The emoji ends the heading line. A non-breaking space keeps it
             next to the last word. aria-hidden: it is only decoration. */}
         {" "}
@@ -76,7 +110,9 @@ export function AuthorAnswer({
       )}
       {outcome === "suggestionAccepted" && (
         <p className="-mt-3 text-sm text-muted">
-          You accepted {respondentName}&apos;s suggestion.
+          {byGuest
+            ? `You accepted ${respondentName}'s suggestion.`
+            : `${respondentName} accepted your suggestion.`}
         </p>
       )}
 
@@ -90,29 +126,16 @@ export function AuthorAnswer({
           eventTitle={`Date with ${respondentName}`}
           // The invited person does not know the decision yet,
           // so this button stands first under the plan.
-          notifyButton={
-            shareText ? (
-              <ShareMenu
-                // The tag changes the address, so the messenger loads a
-                // fresh preview instead of the one it remembered.
-                path={`${publicPath}?s=${outcome}`}
-                text={shareText}
-                buttonLabel={`Let ${respondentName} know`}
-              />
-            ) : null
-          }
-        />
-      )}
-      {!isAgreed && shareText && (
-        <ShareMenu
-          path={`${publicPath}?s=${outcome}`}
-          text={shareText}
-          buttonLabel={`Let ${respondentName} know`}
+          notifyButton={shareMenu}
         />
       )}
 
+      {/* A suggestion on the table: who made it decides the note. */}
       {outcome === "suggested" && (
         <AnswerDetails answer={answer} ownNote={`(${respondentName}'s idea)`} />
+      )}
+      {outcome === "authorSuggested" && (
+        <AnswerDetails answer={answer} ownNote="" />
       )}
 
       {message && (
@@ -122,8 +145,20 @@ export function AuthorAnswer({
       )}
 
       {outcome === "suggested" && (
-        <SuggestionDecision secretToken={secretToken} />
+        <TurnDecision
+          turnKey={turnKey}
+          currentTime={answer.time}
+          currentPlace={answer.place}
+        />
       )}
+
+      {outcome === "authorSuggested" && (
+        <p className="text-sm text-muted">
+          Waiting for {respondentName} to answer.
+        </p>
+      )}
+
+      {!isAgreed && shareMenu}
 
       {isNo && (
         <Link

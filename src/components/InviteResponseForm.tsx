@@ -86,6 +86,8 @@ export function InviteResponseForm({
   const [errors, setErrors] = useState<ResponseErrors>({});
   // What was sent. While it is null, the form is shown.
   const [sentAnswer, setSentAnswer] = useState<SentAnswer | null>(null);
+  // After a suggestion: the author's link to answer it, sent by this person.
+  const [turnToken, setTurnToken] = useState<string | null>(null);
 
   function changeMode(nextMode: Mode) {
     setMode(nextMode);
@@ -133,11 +135,13 @@ export function InviteResponseForm({
       });
 
       if (result.ok) {
+        setTurnToken(result.turnToken);
         // The same values the server got, in a form the screen can show.
         // An own value wins over a picked option, like on the server.
         setSentAnswer({
           // Right after answering, the author has not decided anything yet.
           outcome: getOutcome(type, InviteStatus.PENDING),
+          proposedBy: "guest",
           time:
             proposedTime ??
             times.find((time) => time.id === timeId)?.startsAt ??
@@ -167,7 +171,8 @@ export function InviteResponseForm({
         authorName={authorName}
         whoPays={whoPays}
         friendToken={friendToken}
-        path={`/i/${token}`}
+        token={token}
+        turnToken={turnToken}
         isJustSent
       />
     );

@@ -35,6 +35,13 @@ enum InviteStatus {
   CANCELLED // the author cancelled it
 }
 
+// Who made the latest suggestion in the back-and-forth.
+// The other person is the one who answers it.
+enum Party {
+  AUTHOR
+  GUEST
+}
+
 // What the invited person answered.
 enum ResponseType {
   YES
@@ -50,6 +57,15 @@ model Invite {
   publicToken String @unique // the invited person opens this one
   secretToken String @unique // the author manages the invite here
   friendToken String @unique // read-only page for "let a friend know"
+
+  // The back-and-forth about the time and place. Only the latest suggestion
+  // matters, so it overwrites the one before (no history is kept).
+  // turnToken is a link for the author: when the guest suggests something,
+  // the guest sends it, and whoever has it can answer as the author.
+  // A new suggestion makes a new token, so an old link stops working.
+  // Both are empty for invitations made before this feature.
+  turnToken      String? @unique
+  lastProposedBy Party?
 
   authorName String
   message    String
