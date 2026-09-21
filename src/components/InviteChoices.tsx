@@ -1,7 +1,10 @@
 "use client";
 
 import { LocalDateTime } from "@/components/LocalDateTime";
-import { PLACE_NAME_MAX_LENGTH } from "@/lib/inviteRules";
+import {
+  PLACE_NAME_MAX_LENGTH,
+  PLACE_NOTE_MAX_LENGTH,
+} from "@/lib/inviteRules";
 
 // Data that comes from the server page. Only plain values:
 // a Date object is sent as an ISO string, because props from the server
@@ -26,6 +29,8 @@ type InviteChoicesProps = {
   allowOther: boolean;
   otherTime: string; // "2026-09-12T18:00", the format of <input type="datetime-local">
   otherPlace: string;
+  otherPlaceNote: string; // a hint to the own place, "by the entrance"
+  onOtherPlaceNote: (value: string) => void;
   onOtherTime: (value: string) => void;
   onOtherPlace: (value: string) => void;
   // Messages from the server, shown under each group.
@@ -65,6 +70,8 @@ export function InviteChoices({
   allowOther,
   otherTime,
   otherPlace,
+  otherPlaceNote,
+  onOtherPlaceNote,
   onOtherTime,
   onOtherPlace,
   timeError,
@@ -159,15 +166,27 @@ export function InviteChoices({
                 + Another place
               </label>
               {placeChoice === "other" && (
-                <input
-                  type="text"
-                  value={otherPlace}
-                  onChange={(event) => onOtherPlace(event.target.value)}
-                  placeholder="Where would you like to go?"
-                  maxLength={PLACE_NAME_MAX_LENGTH}
-                  aria-label="Your place"
-                  className={fieldStyle}
-                />
+                <>
+                  <input
+                    type="text"
+                    value={otherPlace}
+                    onChange={(event) => onOtherPlace(event.target.value)}
+                    placeholder="Where would you like to go?"
+                    maxLength={PLACE_NAME_MAX_LENGTH}
+                    aria-label="Your place"
+                    className={fieldStyle}
+                  />
+                  {/* The same hint field as in the author's form. */}
+                  <input
+                    type="text"
+                    value={otherPlaceNote}
+                    onChange={(event) => onOtherPlaceNote(event.target.value)}
+                    placeholder="by the entrance — optional"
+                    maxLength={PLACE_NOTE_MAX_LENGTH}
+                    aria-label="A hint to your place"
+                    className={fieldStyle}
+                  />
+                </>
               )}
             </div>
           )}

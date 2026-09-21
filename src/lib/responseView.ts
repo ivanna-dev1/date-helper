@@ -38,6 +38,7 @@ export const RESPONSE_VIEW_SELECT = {
   message: true,
   proposedTime: true,
   proposedPlace: true,
+  proposedPlaceNote: true,
   chosenTime: { select: { startsAt: true } },
   chosenPlace: { select: { name: true, note: true } },
 } satisfies Prisma.ResponseSelect;
@@ -84,10 +85,32 @@ export function toSentAnswer(
     time: time ? time.toISOString() : null,
     place: place ?? null,
     // An own place has no note: only the author writes notes.
+    // An own place has its own hint; an author's option keeps the author's.
     placeNote: response.proposedPlace
-      ? null
+      ? response.proposedPlaceNote
       : (response.chosenPlace?.note ?? null),
     isOwnTime: response.proposedTime !== null,
     isOwnPlace: response.proposedPlace !== null,
   };
+}
+
+// The latest few words of the back-and-forth and who wrote them.
+export type LastWords = { by: Proposer; text: string };
+
+// Before any move, the latest words are the guest's words from the first
+// answer. After a move, only that move's words count — even if it had none,
+// so old words are not shown as fresh.
+export function getLastWords(
+  lastMessageBy: Party | null,
+  turnMessage: string | null,
+  firstAnswerMessage: string | null,
+): LastWords | null {
+  if (lastMessageBy === null) {
+    return firstAnswerMessage
+      ? { by: "guest", text: firstAnswerMessage }
+      : null;
+  }
+  return turnMessage
+    ? { by: toProposer(lastMessageBy), text: turnMessage }
+    : null;
 }

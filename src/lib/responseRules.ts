@@ -1,7 +1,8 @@
-import { ResponseType } from "@/generated/prisma/enums";
+import { ResponseType, WhoPays } from "@/generated/prisma/enums";
 import {
   AUTHOR_NAME_MAX_LENGTH,
   PLACE_NAME_MAX_LENGTH,
+  PLACE_NOTE_MAX_LENGTH,
   RESPONSE_MESSAGE_MAX_LENGTH,
   isZonedTime,
 } from "@/lib/inviteRules";
@@ -16,6 +17,9 @@ export type SubmitResponseInput = {
   placeId: number | null; // one of the author's place options
   proposedTime: string | null; // the person's own time, UTC with a zone
   proposedPlace: string | null; // the person's own place
+  proposedPlaceNote?: string | null; // a hint to it, "by the entrance"
+  // Who pays, only with a suggestion. Leave it out to keep the author's.
+  whoPays?: WhoPays | null;
 };
 
 // "form" is for problems that are not about one field.
@@ -24,7 +28,12 @@ export type ResponseErrors = Partial<
 >;
 
 // The option ids that really belong to this invitation.
-export type InviteOptionIds = { timeIds: number[]; placeIds: number[] };
+// The option ids that really belong to this invitation, and who pays now.
+export type InviteOptionIds = {
+  timeIds: number[];
+  placeIds: number[];
+  whoPays: WhoPays | null;
+};
 
 /**
  * Checks an answer before we save it. Runs on the server.
@@ -82,6 +91,10 @@ export function validateResponse(
   if (ownPlace !== "") {
     if (ownPlace.length > PLACE_NAME_MAX_LENGTH) {
       errors.place = `Keep it under ${PLACE_NAME_MAX_LENGTH} characters`;
+    } else if (
+      (input.proposedPlaceNote ?? "").trim().length > PLACE_NOTE_MAX_LENGTH
+    ) {
+      errors.place = `Keep the hint under ${PLACE_NOTE_MAX_LENGTH} characters`;
     }
   } else if (input.placeId === null) {
     errors.place = "Pick a place";
@@ -89,9 +102,21 @@ export function validateResponse(
     errors.place = "This place is not in the invitation";
   }
 
+  // A wrong value can only come from a direct request, not from our form.
+  if (
+    input.whoPays !== undefined &&
+    input.whoPays !== null &&
+    !Object.values(WhoPays).includes(input.whoPays)
+  ) {
+    errors.form = "Unknown option for who pays";
+  }
+
   // A suggestion without anything new is just a "yes".
-  if (isCounter && ownTime === null && ownPlace === "") {
-    errors.form = "Add your own time or place, or go back";
+  // A suggestion must change something: the time, the place, or who pays.
+  const changesWhoPays =
+    input.whoPays !== undefined && input.whoPays !== options.whoPays;
+  if (isCounter && ownTime === null && ownPlace === "" && !changesWhoPays) {
+    errors.form = "Change the time, the place or who pays, or go back";
   }
 
   return errors;

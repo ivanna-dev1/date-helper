@@ -4,7 +4,8 @@ import { DatePlan } from "@/components/DatePlan";
 import { getWhoPaysText } from "@/lib/whoPays";
 import { ShareMenu } from "@/components/ShareMenu";
 import { TurnDecision } from "@/components/TurnDecision";
-import type { AnswerOutcome, SentAnswer } from "@/lib/responseView";
+import { LastMessage } from "@/components/LastMessage";
+import type { AnswerOutcome, LastWords, SentAnswer } from "@/lib/responseView";
 
 // The screen the invited person sees after answering.
 // It is shown right after sending (data from the form)
@@ -16,6 +17,8 @@ type ResponseSummaryProps = {
   whoPays: WhoPays | null;
   friendToken: string; // for "Let a friend know where I am"
   token: string; // the invitation's public token, from "/i/k7Fq2mXp9RtA"
+  guestName: string; // this person's own name, for "You" and "Max"
+  lastWords: LastWords | null; // the latest few words of the back-and-forth
   // The author's turn link. The invited person sends it after a suggestion,
   // so the author can answer from it. Empty before any suggestion.
   turnToken: string | null;
@@ -97,10 +100,13 @@ export function ResponseSummary({
   whoPays,
   friendToken,
   token,
+  guestName,
+  lastWords,
   turnToken,
   isJustSent,
   shareVersion,
 }: ResponseSummaryProps) {
+  const whoPaysText = getWhoPaysText(whoPays, authorName, guestName, "guest");
   const { outcome } = answer;
   const byGuest = answer.proposedBy === "guest";
   const heading = HEADINGS[outcome];
@@ -142,10 +148,20 @@ export function ResponseSummary({
         </p>
       )}
 
+      {/* The latest words go before the buttons, so they are read first. */}
+      {isAgreed && (
+        <LastMessage
+          words={lastWords}
+          viewer="guest"
+          authorName={authorName}
+          guestName={guestName}
+        />
+      )}
+
       {isAgreed && (
         <DatePlan
           answer={answer}
-          whoPaysText={getWhoPaysText(whoPays, authorName, "guest")}
+          whoPaysText={whoPaysText}
           invitePath={path}
           friendPath={`/f/${friendToken}`}
           eventTitle={`Date with ${authorName}`}
@@ -156,18 +172,34 @@ export function ResponseSummary({
       )}
 
       {outcome === "suggested" && (
-        <AnswerDetails answer={answer} ownNote="(your idea)" />
+        <AnswerDetails
+          answer={answer}
+          ownNote="(your idea)"
+          whoPaysText={whoPaysText}
+        />
       )}
       {outcome === "authorSuggested" && (
-        <AnswerDetails answer={answer} ownNote="" />
+        <AnswerDetails answer={answer} ownNote="" whoPaysText={whoPaysText} />
+      )}
+
+      {!isAgreed && (
+        <LastMessage
+          words={lastWords}
+          viewer="guest"
+          authorName={authorName}
+          guestName={guestName}
+        />
       )}
 
       {/* The author suggested something back: now this person decides. */}
       {outcome === "authorSuggested" && (
         <TurnDecision
           turnKey={{ kind: "public", token }}
+          viewer="guest"
           currentTime={answer.time}
           currentPlace={answer.place}
+          currentPlaceNote={answer.placeNote}
+          currentWhoPays={whoPays}
         />
       )}
 

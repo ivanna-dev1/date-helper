@@ -21,6 +21,8 @@ import type { ResponseErrors } from "@/lib/responseRules";
 import { toUtcString } from "@/lib/time";
 import { ResponseSummary } from "@/components/ResponseSummary";
 import { getOutcome, type SentAnswer } from "@/lib/responseView";
+import { PayChips } from "@/components/PayChips";
+import { toPayChoice, toWhoPays, type PayChoice } from "@/lib/whoPays";
 
 // Three ways to answer. The mode decides what the form shows.
 // "yes"     — pick a time and a place from the author's options
@@ -73,11 +75,24 @@ export function InviteResponseForm({
 }: InviteResponseFormProps) {
   const [mode, setMode] = useState<Mode>("yes");
 
+  // When there is only one option, there is nothing to choose: it is
+  // picked from the start, so "Works for me!" is the only click needed.
+  const onlyTime: Choice = times.length === 1 ? times[0].id : null;
+  const onlyPlace: Choice = places.length === 1 ? places[0].id : null;
+
   // The state lives here, not in InviteChoices: this form will send it.
-  const [timeChoice, setTimeChoice] = useState<Choice>(null);
-  const [placeChoice, setPlaceChoice] = useState<Choice>(null);
+  const [timeChoice, setTimeChoice] = useState<Choice>(onlyTime);
+  const [placeChoice, setPlaceChoice] = useState<Choice>(onlyPlace);
   const [otherTime, setOtherTime] = useState("");
   const [otherPlace, setOtherPlace] = useState("");
+  const [otherPlaceNote, setOtherPlaceNote] = useState("");
+  // Who pays, from this person's side. Starts with the author's choice,
+  // so "Olia is treating" shows as "Your treat".
+  const [payChoice, setPayChoice] = useState<PayChoice>(
+    toPayChoice(whoPays, "guest"),
+  );
+  // Sent only after a click, so the author's "My treat" is not wiped.
+  const [isPayTouched, setIsPayTouched] = useState(false);
 
   const [name, setName] = useState("");
   const [message, setMessage] = useState("");
@@ -88,6 +103,8 @@ export function InviteResponseForm({
   const [sentAnswer, setSentAnswer] = useState<SentAnswer | null>(null);
   // After a suggestion: the author's link to answer it, sent by this person.
   const [turnToken, setTurnToken] = useState<string | null>(null);
+  // Who pays after this answer (a suggestion may have changed it).
+  const [sentWhoPays, setSentWhoPays] = useState<WhoPays | null>(whoPays);
 
   function changeMode(nextMode: Mode) {
     setMode(nextMode);
@@ -96,8 +113,8 @@ export function InviteResponseForm({
     // "Another time" and "Another place" exist only in the counter mode.
     // If one of them was picked, clear it so no hidden choice stays behind.
     if (nextMode !== "counter") {
-      if (timeChoice === "other") setTimeChoice(null);
-      if (placeChoice === "other") setPlaceChoice(null);
+      if (timeChoice === "other") setTimeChoice(onlyTime);
+      if (placeChoice === "other") setPlaceChoice(onlyPlace);
     }
   }
 
@@ -121,6 +138,12 @@ export function InviteResponseForm({
         : null;
     const proposedPlace =
       isCounter && placeChoice === "other" ? otherPlace.trim() || null : null;
+    const proposedPlaceNote = proposedPlace
+      ? otherPlaceNote.trim() || null
+      : null;
+    // Only a suggestion may change who pays; otherwise the author's stays.
+    const newWhoPays =
+      isCounter && isPayTouched ? toWhoPays(payChoice, "guest") : whoPays;
 
     try {
       const result = await submitResponse({
@@ -132,10 +155,13 @@ export function InviteResponseForm({
         placeId,
         proposedTime,
         proposedPlace,
+        proposedPlaceNote,
+        whoPays: isCounter && isPayTouched ? newWhoPays : undefined,
       });
 
       if (result.ok) {
         setTurnToken(result.turnToken);
+        setSentWhoPays(newWhoPays);
         // The same values the server got, in a form the screen can show.
         // An own value wins over a picked option, like on the server.
         setSentAnswer({
@@ -151,7 +177,7 @@ export function InviteResponseForm({
             places.find((place) => place.id === placeId)?.name ??
             null,
           placeNote: proposedPlace
-            ? null
+            ? proposedPlaceNote
             : (places.find((place) => place.id === placeId)?.note ?? null),
           isOwnTime: proposedTime !== null,
           isOwnPlace: proposedPlace !== null,
@@ -169,9 +195,13 @@ export function InviteResponseForm({
       <ResponseSummary
         answer={sentAnswer}
         authorName={authorName}
-        whoPays={whoPays}
+        whoPays={sentWhoPays}
         friendToken={friendToken}
         token={token}
+        guestName={name.trim()}
+        lastWords={
+          message.trim() ? { by: "guest", text: message.trim() } : null
+        }
         turnToken={turnToken}
         isJustSent
       />
@@ -192,6 +222,8 @@ export function InviteResponseForm({
           allowOther={mode === "counter"}
           otherTime={otherTime}
           otherPlace={otherPlace}
+          otherPlaceNote={otherPlaceNote}
+          onOtherPlaceNote={setOtherPlaceNote}
           onOtherTime={setOtherTime}
           onOtherPlace={setOtherPlace}
           timeError={errors.time}
@@ -203,6 +235,17 @@ export function InviteResponseForm({
         <p className="-mt-2 text-sm text-muted">
           Pick an option or add your own — for the time, the place, or both.
         </p>
+      )}
+
+      {/* A suggestion may also say who pays: "My treat" — "no, my treat". */}
+      {mode === "counter" && (
+        <PayChips
+          value={payChoice}
+          onChange={(value) => {
+            setPayChoice(value);
+            setIsPayTouched(true);
+          }}
+        />
       )}
 
       <div className="flex flex-col">

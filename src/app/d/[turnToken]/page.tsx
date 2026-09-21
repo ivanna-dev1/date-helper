@@ -5,7 +5,11 @@ import { AuthorAnswer } from "@/components/AuthorAnswer";
 import { InviteStatus } from "@/generated/prisma/enums";
 import { DATE_FORMATS } from "@/lib/dateFormats";
 import { getInviteCard, getInviteForCard } from "@/lib/inviteCard";
-import { RESPONSE_VIEW_SELECT, toSentAnswer } from "@/lib/responseView";
+import {
+  getLastWords,
+  RESPONSE_VIEW_SELECT,
+  toSentAnswer,
+} from "@/lib/responseView";
 
 // The author's turn link, sent by the invited person after a suggestion.
 // Whoever has it answers as the author: accept, decline, or suggest
@@ -24,6 +28,8 @@ async function findByTurn(turnToken: string) {
       status: true,
       updatedAt: true,
       lastProposedBy: true,
+      turnMessage: true,
+      lastMessageBy: true,
       response: { select: RESPONSE_VIEW_SELECT },
     },
   });
@@ -99,7 +105,11 @@ export default async function TurnPage(props: PageProps<"/d/[turnToken]">) {
         respondentName={response.respondentName}
         authorName={invite.authorName}
         whoPays={invite.whoPays}
-        message={response.message}
+        lastWords={getLastWords(
+          invite.lastMessageBy,
+          invite.turnMessage,
+          response.message,
+        )}
         turnKey={{ kind: "turn", token: turnToken }}
         friendToken={invite.friendToken}
         publicPath={`/i/${invite.publicToken}`}

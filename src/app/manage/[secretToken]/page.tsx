@@ -9,7 +9,11 @@ import { CancelInvite } from "@/components/CancelInvite";
 import { RememberInvite } from "@/components/RememberInvite";
 import { InviteStatus } from "@/generated/prisma/enums";
 import { DATE_FORMATS } from "@/lib/dateFormats";
-import { RESPONSE_VIEW_SELECT, toSentAnswer } from "@/lib/responseView";
+import {
+  getLastWords,
+  RESPONSE_VIEW_SELECT,
+  toSentAnswer,
+} from "@/lib/responseView";
 
 export const metadata: Metadata = {
   title: "Your invitation — Date Helper",
@@ -35,6 +39,8 @@ export default async function ManagePage(
       status: true,
       updatedAt: true,
       lastProposedBy: true,
+      turnMessage: true,
+      lastMessageBy: true,
       // The answer, if there is one. The same fields as on the invited
       // person's page, so both show the answer the same way.
       response: { select: RESPONSE_VIEW_SELECT },
@@ -111,7 +117,11 @@ export default async function ManagePage(
           respondentName={response.respondentName}
           authorName={invite.authorName}
           whoPays={invite.whoPays}
-          message={response.message}
+          lastWords={getLastWords(
+            invite.lastMessageBy,
+            invite.turnMessage,
+            response.message,
+          )}
           turnKey={{ kind: "secret", token: secretToken }}
           friendToken={invite.friendToken}
           publicPath={publicPath}

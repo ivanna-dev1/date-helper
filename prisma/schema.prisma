@@ -21,9 +21,10 @@ enum DateFormat {
 
 // Optional. The author can leave it empty.
 enum WhoPays {
-  MY_TREAT
+  MY_TREAT // the author pays (the name is from the author's form)
   SPLIT
   DECIDE_LATER
+  GUEST_TREAT // the invited person pays (chosen in the back-and-forth)
 }
 
 // Where the invitation is in its life.
@@ -66,6 +67,11 @@ model Invite {
   // Both are empty for invitations made before this feature.
   turnToken      String? @unique
   lastProposedBy Party?
+
+  // The latest few words of the back-and-forth and who wrote them.
+  // Only the latest one is kept, like the latest suggestion.
+  turnMessage   String?
+  lastMessageBy Party?
 
   authorName String
   message    String
@@ -128,8 +134,10 @@ model Response {
   chosenPlace   PlaceOption? @relation(fields: [chosenPlaceId], references: [id])
 
   // Filled when type is COUNTER. The person can change the time, the place, or both.
-  proposedTime  DateTime?
-  proposedPlace String?
+  proposedTime      DateTime?
+  proposedPlace     String?
+  // The hint to an own place, like "by the entrance" for the author's places.
+  proposedPlaceNote String?
 
   createdAt DateTime @default(now())
 }

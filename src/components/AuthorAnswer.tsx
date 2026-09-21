@@ -6,14 +6,15 @@ import { DatePlan } from "@/components/DatePlan";
 import { getWhoPaysText } from "@/lib/whoPays";
 import { ShareMenu } from "@/components/ShareMenu";
 import { TurnDecision } from "@/components/TurnDecision";
-import type { AnswerOutcome, SentAnswer } from "@/lib/responseView";
+import { LastMessage } from "@/components/LastMessage";
+import type { AnswerOutcome, LastWords, SentAnswer } from "@/lib/responseView";
 
 type AuthorAnswerProps = {
   answer: SentAnswer;
   respondentName: string;
   authorName: string;
   whoPays: WhoPays | null;
-  message: string | null; // the invited person's few words, if any
+  lastWords: LastWords | null; // the latest few words of the back-and-forth
   // The author's key for answering: the secret link or the turn link.
   turnKey: TurnKey;
   friendToken: string; // for "Let a friend know where I am"
@@ -72,7 +73,7 @@ export function AuthorAnswer({
   respondentName,
   authorName,
   whoPays,
-  message,
+  lastWords,
   turnKey,
   friendToken,
   publicPath,
@@ -83,6 +84,12 @@ export function AuthorAnswer({
   const heading = HEADINGS[outcome];
   const shareText = getShareText(outcome, byGuest);
   const isNo = outcome === "no" || outcome === "suggestionDeclined";
+  const whoPaysText = getWhoPaysText(
+    whoPays,
+    authorName,
+    respondentName,
+    "author",
+  );
   const isAgreed = outcome === "yes" || outcome === "suggestionAccepted";
 
   // The tag changes the address, so the messenger loads a fresh preview
@@ -117,10 +124,20 @@ export function AuthorAnswer({
       )}
 
       {/* The date is agreed: the same plan as the invited person sees. */}
+      {/* The latest words go before the buttons, so they are read first. */}
+      {isAgreed && (
+        <LastMessage
+          words={lastWords}
+          viewer="author"
+          authorName={authorName}
+          guestName={respondentName}
+        />
+      )}
+
       {isAgreed && (
         <DatePlan
           answer={answer}
-          whoPaysText={getWhoPaysText(whoPays, authorName, "author")}
+          whoPaysText={whoPaysText}
           invitePath={publicPath}
           friendPath={`/f/${friendToken}`}
           eventTitle={`Date with ${respondentName}`}
@@ -132,23 +149,33 @@ export function AuthorAnswer({
 
       {/* A suggestion on the table: who made it decides the note. */}
       {outcome === "suggested" && (
-        <AnswerDetails answer={answer} ownNote={`(${respondentName}'s idea)`} />
+        <AnswerDetails
+          answer={answer}
+          ownNote={`(${respondentName}'s idea)`}
+          whoPaysText={whoPaysText}
+        />
       )}
       {outcome === "authorSuggested" && (
-        <AnswerDetails answer={answer} ownNote="" />
+        <AnswerDetails answer={answer} ownNote="" whoPaysText={whoPaysText} />
       )}
 
-      {message && (
-        <p className="w-full rounded-xl border-l-4 border-brand bg-bg p-4 text-left text-base text-ink">
-          {message}
-        </p>
+      {!isAgreed && (
+        <LastMessage
+          words={lastWords}
+          viewer="author"
+          authorName={authorName}
+          guestName={respondentName}
+        />
       )}
 
       {outcome === "suggested" && (
         <TurnDecision
           turnKey={turnKey}
+          viewer="author"
           currentTime={answer.time}
           currentPlace={answer.place}
+          currentPlaceNote={answer.placeNote}
+          currentWhoPays={whoPays}
         />
       )}
 

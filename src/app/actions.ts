@@ -7,6 +7,8 @@ import { createToken } from "@/lib/tokens";
 import {
   isZonedTime,
   PLACE_NAME_MAX_LENGTH,
+  PLACE_NOTE_MAX_LENGTH,
+  RESPONSE_MESSAGE_MAX_LENGTH,
   validateInvite,
   type CreateInviteInput,
   type InviteErrors,
@@ -16,7 +18,12 @@ import {
   type ResponseErrors,
   type SubmitResponseInput,
 } from "@/lib/responseRules";
-import { InviteStatus, Party, ResponseType } from "@/generated/prisma/enums";
+import {
+  InviteStatus,
+  Party,
+  ResponseType,
+  WhoPays,
+} from "@/generated/prisma/enums";
 import { Prisma } from "@/generated/prisma/client";
 
 // We return something only when the data is wrong.
@@ -102,6 +109,7 @@ export async function submitResponse(
       id: true,
       expiresAt: true,
       status: true,
+      whoPays: true,
       response: { select: { id: true } },
       timeOptions: { select: { id: true } },
       placeOptions: { select: { id: true } },
@@ -131,6 +139,7 @@ export async function submitResponse(
   const errors = validateResponse(input, {
     timeIds: invite.timeOptions.map((time) => time.id),
     placeIds: invite.placeOptions.map((place) => place.id),
+    whoPays: invite.whoPays,
   });
 
   if (Object.keys(errors).length > 0) {
@@ -146,6 +155,13 @@ export async function submitResponse(
   const proposedPlace = isCounter
     ? (input.proposedPlace ?? "").trim() || null
     : null;
+  // The hint belongs to an own place only.
+  const proposedPlaceNote = proposedPlace
+    ? (input.proposedPlaceNote ?? "").trim() || null
+    : null;
+  // A suggestion may also change who pays. Not given = keep the author's.
+  const whoPaysChange =
+    isCounter && input.whoPays !== undefined ? { whoPays: input.whoPays } : {};
 
   // A picked option is saved only when the person did not suggest their own
   // value instead. For "no" nothing is picked.
@@ -167,6 +183,7 @@ export async function submitResponse(
         status: STATUS_BY_TYPE[input.type],
         turnToken,
         lastProposedBy: isCounter ? Party.GUEST : null,
+        ...whoPaysChange,
         response: {
           create: {
             type: input.type,
@@ -176,6 +193,7 @@ export async function submitResponse(
             chosenPlace: placeId ? { connect: { id: placeId } } : undefined,
             proposedTime,
             proposedPlace,
+            proposedPlaceNote,
           },
         },
       },
@@ -215,14 +233,18 @@ export type TurnKey =
 export type TurnInput = {
   key: TurnKey;
   decision: "accept" | "decline" | "counter";
-  // Only for "counter": the new time (UTC with a zone) and place.
+  // Only for "counter": the new time (UTC with a zone), place, its hint,
+  // and who pays (left out = keep as it is).
   proposedTime?: string;
   proposedPlace?: string;
+  proposedPlaceNote?: string;
+  whoPays?: WhoPays | null;
+  // A few words with any move. Only the latest words are kept.
+  message?: string;
 };
 
 export type TurnResult =
-  | { ok: true; turnToken: string | null }
-  | { ok: false; error: string };
+  { ok: true; turnToken: string | null } | { ok: false; error: string };
 
 const TURN_TAKEN = "This suggestion already has an answer";
 
@@ -256,6 +278,18 @@ export async function answerTurn(input: TurnInput): Promise<TurnResult> {
     ...madeByOther,
   };
 
+  // The words go with the move and replace the ones before. lastMessageBy is
+  // set even without words: it marks that the talk moved on, so older words
+  // (for example from the first answer) are not shown as the latest.
+  const message = (input.message ?? "").trim();
+  if (message.length > RESPONSE_MESSAGE_MAX_LENGTH) {
+    return {
+      ok: false,
+      error: `Keep your words under ${RESPONSE_MESSAGE_MAX_LENGTH} characters`,
+    };
+  }
+  const messageData = { turnMessage: message || null, lastMessageBy: actor };
+
   if (input.decision !== "counter") {
     const { count } = await prisma.invite.updateMany({
       where,
@@ -264,6 +298,7 @@ export async function answerTurn(input: TurnInput): Promise<TurnResult> {
           input.decision === "accept"
             ? InviteStatus.CONFIRMED
             : InviteStatus.DECLINED,
+        ...messageData,
       },
     });
     // Show the fresh state in any case: if nothing changed, the page was old.
@@ -292,6 +327,21 @@ export async function answerTurn(input: TurnInput): Promise<TurnResult> {
     };
   }
 
+  const proposedPlaceNote = (input.proposedPlaceNote ?? "").trim();
+  if (proposedPlaceNote.length > PLACE_NOTE_MAX_LENGTH) {
+    return {
+      ok: false,
+      error: `Keep the hint under ${PLACE_NOTE_MAX_LENGTH} characters`,
+    };
+  }
+  if (
+    input.whoPays !== undefined &&
+    input.whoPays !== null &&
+    !Object.values(WhoPays).includes(input.whoPays)
+  ) {
+    return { ok: false, error: "Unknown option for who pays" };
+  }
+
   const newTime = new Date(proposedTime);
 
   // The author's turn link stays the same when the author moves (it is
@@ -305,14 +355,16 @@ export async function answerTurn(input: TurnInput): Promise<TurnResult> {
       where,
       select: {
         id: true,
+        whoPays: true,
         timeOptions: { select: { id: true, startsAt: true } },
-        placeOptions: { select: { id: true, name: true } },
+        placeOptions: { select: { id: true, name: true, note: true } },
         response: {
           select: {
             proposedTime: true,
             proposedPlace: true,
+            proposedPlaceNote: true,
             chosenTime: { select: { startsAt: true } },
-            chosenPlace: { select: { name: true } },
+            chosenPlace: { select: { name: true, note: true } },
           },
         },
       },
@@ -324,9 +376,16 @@ export async function answerTurn(input: TurnInput): Promise<TurnResult> {
     const current = target.response;
     const currentTime = current.proposedTime ?? current.chosenTime?.startsAt;
     const currentPlace = current.proposedPlace ?? current.chosenPlace?.name;
+    const currentNote = current.proposedPlace
+      ? current.proposedPlaceNote
+      : current.chosenPlace?.note;
+    const newWhoPays =
+      input.whoPays === undefined ? target.whoPays : input.whoPays;
     if (
       currentTime?.getTime() === newTime.getTime() &&
-      currentPlace?.toLowerCase() === proposedPlace.toLowerCase()
+      currentPlace?.toLowerCase() === proposedPlace.toLowerCase() &&
+      (currentNote ?? "") === proposedPlaceNote &&
+      target.whoPays === newWhoPays
     ) {
       return "same" as const;
     }
@@ -336,14 +395,20 @@ export async function answerTurn(input: TurnInput): Promise<TurnResult> {
     const timeOption = target.timeOptions.find(
       (option) => option.startsAt.getTime() === newTime.getTime(),
     );
+    // Only when the hint is the author's too (or empty): a new hint makes
+    // it the person's own place.
     const placeOption = target.placeOptions.find(
-      (option) => option.name.toLowerCase() === proposedPlace.toLowerCase(),
+      (option) =>
+        option.name.toLowerCase() === proposedPlace.toLowerCase() &&
+        (proposedPlaceNote === "" || proposedPlaceNote === (option.note ?? "")),
     );
 
     const { count } = await tx.invite.updateMany({
       where: { id: target.id, ...where },
       data: {
         lastProposedBy: actor,
+        whoPays: newWhoPays,
+        ...messageData,
         ...(newTurnToken ? { turnToken: newTurnToken } : {}),
       },
     });
@@ -354,6 +419,7 @@ export async function answerTurn(input: TurnInput): Promise<TurnResult> {
       data: {
         proposedTime: timeOption ? null : newTime,
         proposedPlace: placeOption ? null : proposedPlace,
+        proposedPlaceNote: placeOption ? null : proposedPlaceNote || null,
         chosenTime: timeOption
           ? { connect: { id: timeOption.id } }
           : { disconnect: true },
@@ -366,7 +432,10 @@ export async function answerTurn(input: TurnInput): Promise<TurnResult> {
   });
 
   if (invite === "same") {
-    return { ok: false, error: "Change the time or the place first" };
+    return {
+      ok: false,
+      error: "Change the time, the place or who pays first",
+    };
   }
 
   refresh();

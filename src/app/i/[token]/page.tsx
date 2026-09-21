@@ -7,7 +7,11 @@ import { AuthorPageLink } from "@/components/AuthorPageLink";
 import { InviteStatus } from "@/generated/prisma/enums";
 import { DATE_FORMATS } from "@/lib/dateFormats";
 import { getInviteCard, getInviteForCard } from "@/lib/inviteCard";
-import { RESPONSE_VIEW_SELECT, toSentAnswer } from "@/lib/responseView";
+import {
+  getLastWords,
+  RESPONSE_VIEW_SELECT,
+  toSentAnswer,
+} from "@/lib/responseView";
 
 // The title and description a messenger shows next to the picture.
 // They follow the state of the date, like the picture does.
@@ -64,6 +68,8 @@ export default async function InvitePage(props: PageProps<"/i/[token]">) {
       // suggestion. Both fields are empty on old invitations.
       turnToken: true,
       lastProposedBy: true,
+      turnMessage: true,
+      lastMessageBy: true,
       message: true,
       format: true,
       expiresAt: true,
@@ -144,6 +150,12 @@ export default async function InvitePage(props: PageProps<"/i/[token]">) {
           whoPays={invite.whoPays}
           friendToken={invite.friendToken}
           token={token}
+          guestName={response.respondentName}
+          lastWords={getLastWords(
+            invite.lastMessageBy,
+            invite.turnMessage,
+            response.message,
+          )}
           turnToken={invite.turnToken}
           isJustSent={false}
           shareVersion={invite.updatedAt.getTime().toString(36)}

@@ -6,13 +6,19 @@ type AnswerDetailsProps = {
   // The note next to a suggested value: "(your idea)" for the invited
   // person, "(Max's idea)" for the author.
   ownNote: string;
+  // "Olia is treating" and the like, or null when nobody chose.
+  whoPaysText?: string | null;
 };
 
 const labelStyle = "text-xs font-medium uppercase tracking-wide text-muted";
 const ownNoteStyle = "ml-1 text-sm text-quiet";
 
 // "When" and "Where" of an answer. Both pages show it.
-export function AnswerDetails({ answer, ownNote }: AnswerDetailsProps) {
+export function AnswerDetails({
+  answer,
+  ownNote,
+  whoPaysText,
+}: AnswerDetailsProps) {
   return (
     <dl className="flex flex-col gap-4">
       {answer.time && (
@@ -20,7 +26,9 @@ export function AnswerDetails({ answer, ownNote }: AnswerDetailsProps) {
           <dt className={labelStyle}>When</dt>
           <dd className="text-base font-semibold text-ink">
             <LocalDateTime value={answer.time} />
-            {answer.isOwnTime && <span className={ownNoteStyle}>{ownNote}</span>}
+            {answer.isOwnTime && (
+              <span className={ownNoteStyle}>{ownNote}</span>
+            )}
           </dd>
         </div>
       )}
@@ -32,8 +40,16 @@ export function AnswerDetails({ answer, ownNote }: AnswerDetailsProps) {
             {answer.isOwnPlace && (
               <span className={ownNoteStyle}>{ownNote}</span>
             )}
+            {answer.placeNote && (
+              <span className="block text-sm font-normal text-muted">
+                {answer.placeNote}
+              </span>
+            )}
           </dd>
         </div>
+      )}
+      {whoPaysText && (
+        <p className="text-xs italic text-quiet">{whoPaysText}</p>
       )}
     </dl>
   );
