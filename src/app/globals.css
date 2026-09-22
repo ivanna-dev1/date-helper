@@ -8,9 +8,20 @@
   --color-brand: #e8b4c8; /* main pink */
   --color-accent: #d4847c; /* peach accent */
   --color-ink: #2c2c2c; /* main text */
-  --color-muted: #8a8a8a; /* less important text */
-  --color-quiet: #b0b0b0; /* the quietest things */
+  /* Darker than in the mockup, so small text is easy to read
+     (contrast with the background: muted 4.7:1, quiet 3.2:1). */
+  --color-muted: #6e6e6e; /* less important text */
+  --color-quiet: #8a8a8a; /* the quietest things */
   --color-line: #e0d5ce; /* borders */
+
+  /* A card comes in softly: it fades in and moves up a little. */
+  --animate-card-in: card-in 0.35s ease-out both;
+  @keyframes card-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
 }
 
 @theme inline {
@@ -20,4 +31,19 @@
 body {
   background: var(--color-bg);
   color: var(--color-ink);
+}
+
+/* A clear frame around the button or link reached with the keyboard.
+   Only for the keyboard (:focus-visible), so taps and clicks look the same. */
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Some people turn motion off in their system settings. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-card-in {
+    animation: none;
+  }
 }

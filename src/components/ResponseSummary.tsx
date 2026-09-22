@@ -64,11 +64,7 @@ const HEADINGS: Record<
 // What the invited person sends to the author, and by which link.
 // After a suggestion the link is the author's turn link, so the author
 // can answer from it; otherwise the author gets the invitation link.
-function getShare(
-  outcome: AnswerOutcome,
-  byGuest: boolean,
-  isJustSent: boolean,
-): { text: string; toTurnLink: boolean } | null {
+function getShare(outcome: AnswerOutcome, byGuest: boolean): { text: string; toTurnLink: boolean } | null {
   // A suggestion waits for the author: the link stays useful, so the button
   // stays too, also when the page is opened again.
   if (outcome === "suggested") {
@@ -87,11 +83,13 @@ function getShare(
       toTurnLink: true,
     };
   }
-  // The first answer: only right after sending. Later the author knows.
-  if (isJustSent && outcome === "yes") {
+  // The first answer. Also when the page is opened again: saving the answer
+  // sets the browser's role cookie, and then the server draws the page anew,
+  // so "just sent" is lost. And a reminder to tell the author does no harm.
+  if (outcome === "yes") {
     return { text: "I said yes to your invitation! 🎉", toTurnLink: false };
   }
-  if (isJustSent && outcome === "no") {
+  if (outcome === "no") {
     return { text: "I answered your invitation 🌷", toTurnLink: false };
   }
   return null;
@@ -115,7 +113,7 @@ export function ResponseSummary({
   const byGuest = answer.proposedBy === "guest";
   const heading = HEADINGS[outcome];
   const path = `/i/${token}`;
-  const share = getShare(outcome, byGuest, isJustSent);
+  const share = getShare(outcome, byGuest);
   // The date is agreed: show the shared plan instead of the answer details.
   const isAgreed = outcome === "yes" || outcome === "suggestionAccepted";
 
@@ -135,7 +133,7 @@ export function ResponseSummary({
   ) : null;
 
   return (
-    <section className="flex flex-col items-center gap-6 rounded-2xl border border-line bg-surface px-5 py-8 text-center">
+    <section className="animate-card-in flex flex-col items-center gap-6 rounded-2xl border border-line bg-surface px-5 py-8 text-center">
       <h2 className="text-2xl font-bold text-ink">
         {heading.title(authorName, byGuest)}
         {/* The emoji ends the heading line. A non-breaking space keeps it

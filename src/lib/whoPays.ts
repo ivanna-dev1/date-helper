@@ -15,9 +15,13 @@ export function getWhoPaysText(
 ): string | null {
   switch (whoPays) {
     case WhoPays.MY_TREAT:
-      return viewer === "author" ? "Your treat" : `${authorName} is treating`;
+      return viewer === "author"
+        ? "My treat"
+        : `${authorName} is treating`;
     case WhoPays.GUEST_TREAT:
-      return viewer === "guest" ? "Your treat" : `${guestName} is treating`;
+      return viewer === "guest"
+        ? "My treat"
+        : `${guestName} is treating`;
     case WhoPays.SPLIT:
       return "Splitting the bill";
     case WhoPays.DECIDE_LATER:

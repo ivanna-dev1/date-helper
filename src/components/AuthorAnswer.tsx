@@ -107,7 +107,7 @@ export function AuthorAnswer({
   ) : null;
 
   return (
-    <section className="flex flex-col items-center gap-6 rounded-2xl border border-line bg-surface px-5 py-8 text-center">
+    <section className="animate-card-in flex flex-col items-center gap-6 rounded-2xl border border-line bg-surface px-5 py-8 text-center">
       <h2 className="text-2xl font-bold text-ink">
         {heading.title(respondentName, byGuest)}
         {/* The emoji ends the heading line. A non-breaking space keeps it

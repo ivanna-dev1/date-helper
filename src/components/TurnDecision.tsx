@@ -258,6 +258,7 @@ export function TurnDecision({
                   onChange={(event) =>
                     places.update(place.id, { name: event.target.value })
                   }
+                  placeholder="Where would you like to go?"
                   maxLength={PLACE_NAME_MAX_LENGTH}
                   aria-label={`Place ${index + 1}`}
                   className={fieldStyle}
