@@ -240,7 +240,10 @@ export function CreateInviteForm() {
       </div>
 
       <fieldset className="flex flex-col border-0 p-0">
-        <legend className={labelStyle}>When works for you?</legend>
+        <legend className={labelStyle}>When?</legend>
+        <p className="mb-2 text-xs text-quiet">
+          Add one time or a few — they pick one.
+        </p>
 
         <div className="flex flex-col gap-2">
           {times.items.map((time, index) => (
@@ -279,6 +282,9 @@ export function CreateInviteForm() {
 
       <fieldset className="flex flex-col border-0 p-0">
         <legend className={labelStyle}>Where?</legend>
+        <p className="mb-2 text-xs text-quiet">
+          One place or a few. The note says where exactly to meet.
+        </p>
 
         <div className="flex flex-col gap-3">
           {places.items.map((place, index) => (
@@ -331,7 +337,9 @@ export function CreateInviteForm() {
       </fieldset>
 
       <fieldset className="flex flex-col border-0 p-0">
-        <legend className={labelStyle}>How long is the link alive?</legend>
+        <legend className={labelStyle}>
+          How long is the invitation alive?
+        </legend>
         <div className="flex flex-wrap items-center gap-2">
           {EXPIRY_OPTIONS.map((days) => {
             const isActive = days === expiryDays;
@@ -373,9 +381,7 @@ export function CreateInviteForm() {
                 key={option.value}
                 type="button"
                 // Clicking the active one clears it, so "no answer" stays reachable.
-                onClick={() =>
-                  setWhoPays(isActive ? null : option.value)
-                }
+                onClick={() => setWhoPays(isActive ? null : option.value)}
                 aria-pressed={isActive}
                 className={`rounded-xl border px-2.5 py-1.5 text-xs ${
                   isActive

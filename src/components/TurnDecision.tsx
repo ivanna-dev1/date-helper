@@ -7,12 +7,14 @@ import { PayChips } from "@/components/PayChips";
 import { InviteChoices, type Choice } from "@/components/InviteChoices";
 import { useDraftList } from "@/hooks/useDraftList";
 import {
-  MAX_PLACE_OPTIONS,
-  MAX_TIME_OPTIONS,
-  PLACE_NAME_MAX_LENGTH,
-  PLACE_NOTE_MAX_LENGTH,
-  RESPONSE_MESSAGE_MAX_LENGTH,
-} from "@/lib/inviteRules";
+  createPlaceDraft,
+  createTimeDraft,
+  OptionLists,
+  toLocalInputValue,
+  type PlaceDraft,
+  type TimeDraft,
+} from "@/components/OptionLists";
+import { RESPONSE_MESSAGE_MAX_LENGTH } from "@/lib/inviteRules";
 import type { SentAnswer } from "@/lib/responseView";
 import { toUtcString } from "@/lib/time";
 import {
@@ -30,45 +32,19 @@ type TurnDecisionProps = {
   otherName: string; // the other person, for the "Olia's treat" chip
 };
 
-type TimeDraft = {
-  id: string;
-  value: string; // "2026-09-12T18:00", the format of <input type="datetime-local">
-};
-
-type PlaceDraft = {
-  id: string;
-  name: string;
-  note: string;
-};
-
-function createTimeDraft(): TimeDraft {
-  return { id: crypto.randomUUID(), value: "" };
-}
-
-function createPlaceDraft(): PlaceDraft {
-  return { id: crypto.randomUUID(), name: "", note: "" };
-}
-
 const labelStyle = "text-xs font-medium uppercase tracking-wide text-muted";
 const fieldStyle =
   "rounded-xl border border-line bg-surface px-3.5 py-3 text-base text-ink outline-none placeholder:text-quiet focus:border-accent";
 const quietButton =
   "w-full rounded-xl border border-line py-3 text-sm font-medium text-muted disabled:opacity-60";
-const addButtonStyle =
-  "rounded-xl border-2 border-dashed border-accent px-3 py-2.5 text-sm font-medium text-accent";
-const removeButtonStyle = "px-2 text-xl text-accent";
 
-// "2026-12-20T16:00:00.000Z" → "2026-12-20T18:00" in the reader's own zone,
-// the format of <input type="datetime-local">. Runs only in a click handler,
-// so it is always in the browser and knows the zone.
-function toLocalInputValue(iso: string): string {
-  const date = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return (
-    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
-    `T${pad(date.getHours())}:${pad(date.getMinutes())}`
-  );
-}
+// Ready-made lines for the few words, like in the author's form.
+// They fit any move, because one field is used for all three.
+const MESSAGE_TEMPLATES = [
+  "Sounds good!",
+  "How about this instead?",
+  "See you there!",
+];
 
 // Nothing to do: the choice cards below never show "your own" fields.
 function ignore() {}
@@ -194,6 +170,18 @@ export function TurnDecision({
         rows={2}
         className={`${fieldStyle} resize-none`}
       />
+      <span className="flex flex-wrap gap-1.5">
+        {MESSAGE_TEMPLATES.map((template) => (
+          <button
+            key={template}
+            type="button"
+            onClick={() => setMessage(template)}
+            className="rounded-full border border-dashed border-line px-2.5 py-1.5 text-xs text-muted"
+          >
+            {template}
+          </button>
+        ))}
+      </span>
       <span className="self-end text-xs text-quiet">
         {RESPONSE_MESSAGE_MAX_LENGTH - message.length} characters left
       </span>
@@ -209,99 +197,7 @@ export function TurnDecision({
         }}
         className="flex w-full flex-col gap-5 text-left"
       >
-        {/* The same lists as in the author's form: one option, or a few
-            for the other person to pick from. */}
-        <fieldset className="flex flex-col gap-2">
-          <legend className={`${labelStyle} mb-1.5`}>
-            When works for you?
-          </legend>
-          {times.items.map((time, index) => (
-            <div key={time.id} className="flex items-center gap-2">
-              <input
-                type="datetime-local"
-                value={time.value}
-                min={minTime}
-                onChange={(event) =>
-                  times.update(time.id, { value: event.target.value })
-                }
-                aria-label={`Time option ${index + 1}`}
-                className={`${fieldStyle} min-w-0 flex-1`}
-              />
-              {times.items.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => times.remove(time.id)}
-                  aria-label={`Remove time option ${index + 1}`}
-                  className={removeButtonStyle}
-                >
-                  ×
-                </button>
-              )}
-            </div>
-          ))}
-          {times.items.length < MAX_TIME_OPTIONS && (
-            <button
-              type="button"
-              onClick={times.add}
-              className={addButtonStyle}
-            >
-              + Add another option
-            </button>
-          )}
-        </fieldset>
-
-        <fieldset className="flex flex-col gap-3">
-          <legend className={`${labelStyle} mb-1.5`}>Where?</legend>
-          {places.items.map((place, index) => (
-            <div key={place.id} className="flex items-start gap-2">
-              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                <input
-                  type="text"
-                  value={place.name}
-                  onChange={(event) =>
-                    places.update(place.id, { name: event.target.value })
-                  }
-                  placeholder="Where would you like to go?"
-                  maxLength={PLACE_NAME_MAX_LENGTH}
-                  aria-label={`Place ${index + 1}`}
-                  className={fieldStyle}
-                />
-                {/* The hint to the place, so "where exactly" is never lost
-                    on the way. */}
-                <input
-                  type="text"
-                  value={place.note}
-                  onChange={(event) =>
-                    places.update(place.id, { note: event.target.value })
-                  }
-                  placeholder="by the entrance — optional"
-                  maxLength={PLACE_NOTE_MAX_LENGTH}
-                  aria-label={`Note for place ${index + 1}`}
-                  className={`${fieldStyle} py-2 text-sm`}
-                />
-              </div>
-              {places.items.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => places.remove(place.id)}
-                  aria-label={`Remove place ${index + 1}`}
-                  className={removeButtonStyle}
-                >
-                  ×
-                </button>
-              )}
-            </div>
-          ))}
-          {places.items.length < MAX_PLACE_OPTIONS && (
-            <button
-              type="button"
-              onClick={places.add}
-              className={addButtonStyle}
-            >
-              + Add another option
-            </button>
-          )}
-        </fieldset>
+        <OptionLists times={times} places={places} minTime={minTime} />
 
         <PayChips
           value={payChoice}

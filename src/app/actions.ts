@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { createToken } from "@/lib/tokens";
 import { getBrowserRole, rememberBrowserRole } from "@/lib/browserRole";
+import { TURN_OPTIONS_SELECT } from "@/lib/responseView";
 import {
   isZonedTime,
   MAX_PLACE_OPTIONS,
@@ -17,6 +18,10 @@ import {
   type InviteErrors,
 } from "@/lib/inviteRules";
 import {
+  cleanPlaces,
+  cleanTimes,
+  placesKey,
+  timesKey,
   validateResponse,
   type ResponseErrors,
   type SubmitResponseInput,
@@ -87,7 +92,16 @@ export async function createInvite(
 // turnToken comes back after a suggestion: the guest sends it to the author,
 // so the author can answer from that link.
 export type SubmitResponseResult =
-  | { ok: true; turnToken: string | null }
+  | {
+      ok: true;
+      turnToken: string | null;
+      // The saved options of a suggestion, so the screen can show them
+      // right away (they get their ids only in the database).
+      choices: {
+        times: { id: number; startsAt: string }[];
+        places: { id: number; name: string; note: string | null }[];
+      } | null;
+    }
   | { ok: false; errors: ResponseErrors };
 
 // Which invitation status each kind of answer leads to.
@@ -118,8 +132,8 @@ export async function submitResponse(
       status: true,
       whoPays: true,
       response: { select: { id: true } },
-      timeOptions: { select: { id: true } },
-      placeOptions: { select: { id: true } },
+      timeOptions: { select: { id: true, startsAt: true } },
+      placeOptions: { select: { id: true, name: true, note: true } },
     },
   });
 
@@ -154,8 +168,8 @@ export async function submitResponse(
   }
 
   const errors = validateResponse(input, {
-    timeIds: invite.timeOptions.map((time) => time.id),
-    placeIds: invite.placeOptions.map((place) => place.id),
+    times: invite.timeOptions,
+    places: invite.placeOptions,
     whoPays: invite.whoPays,
   });
 
@@ -166,27 +180,22 @@ export async function submitResponse(
   const isNo = input.type === ResponseType.NO;
   const isCounter = input.type === ResponseType.COUNTER;
 
-  // Own values are saved only for a counter answer.
-  const proposedTime =
-    isCounter && input.proposedTime ? new Date(input.proposedTime) : null;
-  const proposedPlace = isCounter
-    ? (input.proposedPlace ?? "").trim() || null
-    : null;
-  // The hint belongs to an own place only.
-  const proposedPlaceNote = proposedPlace
-    ? (input.proposedPlaceNote ?? "").trim() || null
-    : null;
+  // A suggestion keeps its options in their own rows, like every later
+  // move does. The answer itself then holds no time and no place.
+  const times = isCounter ? cleanTimes(input.proposedTimes) : [];
+  const places = isCounter ? cleanPlaces(input.proposedPlaces) : [];
   // A suggestion may also change who pays. Not given = keep the author's.
   const whoPaysChange =
     isCounter && input.whoPays !== undefined ? { whoPays: input.whoPays } : {};
 
-  // A picked option is saved only when the person did not suggest their own
-  // value instead. For "no" nothing is picked.
-  const timeId = isNo || proposedTime ? null : input.timeId;
-  const placeId = isNo || proposedPlace ? null : input.placeId;
+  // "Yes" picks one of the author's options. For "no" nothing is picked.
+  const timeId = isNo || isCounter ? null : input.timeId;
+  const placeId = isNo || isCounter ? null : input.placeId;
 
   // A suggestion starts the back-and-forth: the author gets a fresh link.
   const turnToken = isCounter ? createToken() : null;
+  // Filled after the write: the options with the ids the database gave them.
+  let savedChoices: (SubmitResponseResult & { ok: true })["choices"] = null;
 
   try {
     // One nested write again: the answer and the new status of the
@@ -194,13 +203,22 @@ export async function submitResponse(
     // `status: PENDING` in `where`: the answer is saved only if the invite
     // still waits for it. If the author cancelled it a moment ago,
     // Prisma finds no row and throws P2025.
-    await prisma.invite.update({
+    const saved = await prisma.invite.update({
       where: { id: invite.id, status: InviteStatus.PENDING },
       data: {
         status: STATUS_BY_TYPE[input.type],
         turnToken,
         lastProposedBy: isCounter ? Party.GUEST : null,
         ...whoPaysChange,
+        turnTimes: {
+          create: times.map((time) => ({ startsAt: new Date(time) })),
+        },
+        turnPlaces: {
+          create: places.map((place) => ({
+            name: place.name,
+            note: place.note || null,
+          })),
+        },
         response: {
           create: {
             type: input.type,
@@ -208,13 +226,20 @@ export async function submitResponse(
             message: input.message.trim() || null,
             chosenTime: timeId ? { connect: { id: timeId } } : undefined,
             chosenPlace: placeId ? { connect: { id: placeId } } : undefined,
-            proposedTime,
-            proposedPlace,
-            proposedPlaceNote,
           },
         },
       },
+      select: { ...TURN_OPTIONS_SELECT },
     });
+    savedChoices = isCounter
+      ? {
+          times: saved.turnTimes.map((time) => ({
+            id: time.id,
+            startsAt: time.startsAt.toISOString(),
+          })),
+          places: saved.turnPlaces,
+        }
+      : null;
   } catch (error) {
     // The check above is not enough on its own. Two answers can come at the
     // same moment (from a phone and a laptop). Both pass the check, because
@@ -237,7 +262,7 @@ export async function submitResponse(
   }
 
   await rememberBrowserRole(input.token, "guest");
-  return { ok: true, turnToken };
+  return { ok: true, turnToken, choices: savedChoices };
 }
 
 // Who is acting, and by which link. The link decides the rights:
@@ -300,21 +325,6 @@ function checkTurnOptions(times: string[], places: NewPlace[]): string | null {
     return `Keep the hint under ${PLACE_NOTE_MAX_LENGTH} characters`;
   }
   return null;
-}
-
-// A list of options as one string, in a fixed order, so two lists can be
-// compared: "the same as on the table" does not depend on the order.
-function timesKey(times: Date[]): string {
-  return times
-    .map((time) => time.getTime())
-    .sort()
-    .join(",");
-}
-function placeKey(place: { name: string; note: string | null }): string {
-  return `${place.name.toLowerCase()}|${place.note ?? ""}`;
-}
-function placesKey(places: { name: string; note: string | null }[]): string {
-  return places.map(placeKey).sort().join(",");
 }
 
 // The data of the invitation that a move needs, loaded inside the move's
@@ -505,17 +515,8 @@ export async function answerTurn(input: TurnInput): Promise<TurnResult> {
 
   // A new suggestion: check it like any other suggestion. Empty rows are
   // dropped, and the same time or place twice counts once.
-  const times = [
-    ...new Set((input.proposedTimes ?? []).filter((time) => time !== "")),
-  ];
-  const places = (input.proposedPlaces ?? [])
-    .map((place) => ({ name: place.name.trim(), note: place.note.trim() }))
-    .filter((place) => place.name !== "")
-    .filter(
-      (place, index, list) =>
-        list.findIndex((other) => placeKey(other) === placeKey(place)) ===
-        index,
-    );
+  const times = cleanTimes(input.proposedTimes ?? []);
+  const places = cleanPlaces(input.proposedPlaces ?? []);
   const optionsError = checkTurnOptions(times, places);
   if (optionsError) {
     return { ok: false, error: optionsError };

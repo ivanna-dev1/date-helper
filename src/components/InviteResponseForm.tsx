@@ -22,6 +22,15 @@ import { toUtcString } from "@/lib/time";
 import { ResponseSummary } from "@/components/ResponseSummary";
 import { getOutcome, type SentAnswer } from "@/lib/responseView";
 import { PayChips } from "@/components/PayChips";
+import { useDraftList } from "@/hooks/useDraftList";
+import {
+  createPlaceDraft,
+  createTimeDraft,
+  OptionLists,
+  toLocalInputValue,
+  type PlaceDraft,
+  type TimeDraft,
+} from "@/components/OptionLists";
 import {
   getWhoPaysText,
   toPayChoice,
@@ -64,6 +73,22 @@ const SUBMIT_LABELS: Record<Mode, string> = {
   no: "Send my answer",
 };
 
+// Ready-made lines, like in the author's form: it is easier to answer
+// than to stare at an empty field. They depend on the answer.
+const MESSAGE_TEMPLATES: Record<Mode, string[]> = {
+  yes: ["Sounds great, see you!", "Perfect, I'll be there", "Can't wait!"],
+  counter: [
+    "Those don't work for me, but how about this?",
+    "I'd love to — another time?",
+    "What about this instead?",
+  ],
+  no: [
+    "Thank you for asking, but I can't this time",
+    "Sorry, I'm busy that day",
+    "Not this time — but thank you",
+  ],
+};
+
 const MESSAGE_PLACEHOLDERS: Record<Mode, string> = {
   yes: "Sounds great, see you!",
   counter: "Those don't work for me, but how about this?",
@@ -91,9 +116,13 @@ export function InviteResponseForm({
   // The state lives here, not in InviteChoices: this form will send it.
   const [timeChoice, setTimeChoice] = useState<Choice>(onlyTime);
   const [placeChoice, setPlaceChoice] = useState<Choice>(onlyPlace);
-  const [otherTime, setOtherTime] = useState("");
-  const [otherPlace, setOtherPlace] = useState("");
-  const [otherPlaceNote, setOtherPlaceNote] = useState("");
+  // The suggestion: the same lists as in the author's form and in every
+  // later move. They start from the author's options, because people
+  // usually change one thing, not all of them.
+  const ownTimes = useDraftList<TimeDraft>(createTimeDraft);
+  const ownPlaces = useDraftList<PlaceDraft>(createPlaceDraft);
+  // The earliest time the picker allows: past days and hours are greyed out.
+  const [minTime, setMinTime] = useState("");
   // Who pays, from this person's side. Starts with the author's choice,
   // so "Olia is treating" shows as the picked "Olia's treat" chip.
   const [payChoice, setPayChoice] = useState<PayChoice>(
@@ -118,11 +147,22 @@ export function InviteResponseForm({
     setMode(nextMode);
     // Old messages are about the old mode, so they would only confuse.
     setErrors({});
-    // "Another time" and "Another place" exist only in the counter mode.
-    // If one of them was picked, clear it so no hidden choice stays behind.
-    if (nextMode !== "counter") {
-      if (timeChoice === "other") setTimeChoice(onlyTime);
-      if (placeChoice === "other") setPlaceChoice(onlyPlace);
+    if (nextMode === "counter") {
+      // Runs in a click handler, so the browser's time zone is known.
+      ownTimes.replace(
+        times.map((time) => ({
+          id: crypto.randomUUID(),
+          value: toLocalInputValue(time.startsAt),
+        })),
+      );
+      ownPlaces.replace(
+        places.map((place) => ({
+          id: crypto.randomUUID(),
+          name: place.name,
+          note: place.note ?? "",
+        })),
+      );
+      setMinTime(toLocalInputValue(new Date().toISOString()));
     }
   }
 
@@ -139,16 +179,18 @@ export function InviteResponseForm({
     const timeId = !isNo && typeof timeChoice === "number" ? timeChoice : null;
     const placeId =
       !isNo && typeof placeChoice === "number" ? placeChoice : null;
-    // Own time goes as UTC, turned in the browser (see src/lib/time.ts).
-    const proposedTime =
-      isCounter && timeChoice === "other" && otherTime !== ""
-        ? toUtcString(otherTime)
-        : null;
-    const proposedPlace =
-      isCounter && placeChoice === "other" ? otherPlace.trim() || null : null;
-    const proposedPlaceNote = proposedPlace
-      ? otherPlaceNote.trim() || null
-      : null;
+    // Own times go as UTC, turned in the browser (see src/lib/time.ts).
+    const proposedTimes = isCounter
+      ? ownTimes.items
+          .filter((time) => time.value !== "")
+          .map((time) => toUtcString(time.value))
+      : [];
+    const proposedPlaces = isCounter
+      ? ownPlaces.items.map((place) => ({
+          name: place.name,
+          note: place.note,
+        }))
+      : [];
     // Only a suggestion may change who pays; otherwise the author's stays.
     const newWhoPays =
       isCounter && isPayTouched ? toWhoPays(payChoice, "guest") : whoPays;
@@ -161,35 +203,39 @@ export function InviteResponseForm({
         message,
         timeId,
         placeId,
-        proposedTime,
-        proposedPlace,
-        proposedPlaceNote,
+        proposedTimes,
+        proposedPlaces,
         whoPays: isCounter && isPayTouched ? newWhoPays : undefined,
       });
 
       if (result.ok) {
         setTurnToken(result.turnToken);
         setSentWhoPays(newWhoPays);
-        // The same values the server got, in a form the screen can show.
-        // An own value wins over a picked option, like on the server.
+        // The same values the server saved, in a form the screen can show.
+        // A suggestion with one time and one place looks like a plain plan;
+        // with more options the screen shows the choice, like the server.
+        const saved = result.choices;
+        const hasChoice =
+          saved !== null && (saved.times.length > 1 || saved.places.length > 1);
+        const onlySavedPlace = saved && !hasChoice ? saved.places[0] : null;
         setSentAnswer({
           // Right after answering, the author has not decided anything yet.
           outcome: getOutcome(type, InviteStatus.PENDING),
           proposedBy: "guest",
-          time:
-            proposedTime ??
-            times.find((time) => time.id === timeId)?.startsAt ??
-            null,
-          place:
-            proposedPlace ??
-            places.find((place) => place.id === placeId)?.name ??
-            null,
-          placeNote: proposedPlace
-            ? proposedPlaceNote
+          time: saved
+            ? !hasChoice
+              ? saved.times[0].startsAt
+              : null
+            : (times.find((time) => time.id === timeId)?.startsAt ?? null),
+          place: saved
+            ? (onlySavedPlace?.name ?? null)
+            : (places.find((place) => place.id === placeId)?.name ?? null),
+          placeNote: saved
+            ? (onlySavedPlace?.note ?? null)
             : (places.find((place) => place.id === placeId)?.note ?? null),
-          isOwnTime: proposedTime !== null,
-          isOwnPlace: proposedPlace !== null,
-          choices: null,
+          isOwnTime: false,
+          isOwnPlace: false,
+          choices: hasChoice ? saved : null,
         });
       } else {
         setErrors(result.errors);
@@ -219,8 +265,18 @@ export function InviteResponseForm({
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+      {/* The suggestion has the same lists as the author's form, so this
+          screen looks like every later move in the back-and-forth. */}
+      {mode === "counter" && (
+        <>
+          <OptionLists times={ownTimes} places={ownPlaces} minTime={minTime} />
+          {errors.time && <p className={errorStyle}>{errors.time}</p>}
+          {errors.place && <p className={errorStyle}>{errors.place}</p>}
+        </>
+      )}
+
       {/* When the answer is "no", there is nothing to pick. */}
-      {mode !== "no" && (
+      {mode === "yes" && (
         <InviteChoices
           times={times}
           places={places}
@@ -228,22 +284,16 @@ export function InviteResponseForm({
           placeChoice={placeChoice}
           onTimeChoice={setTimeChoice}
           onPlaceChoice={setPlaceChoice}
-          allowOther={mode === "counter"}
-          otherTime={otherTime}
-          otherPlace={otherPlace}
-          otherPlaceNote={otherPlaceNote}
-          onOtherPlaceNote={setOtherPlaceNote}
-          onOtherTime={setOtherTime}
-          onOtherPlace={setOtherPlace}
+          allowOther={false}
+          otherTime=""
+          otherPlace=""
+          otherPlaceNote=""
+          onOtherPlaceNote={() => {}}
+          onOtherTime={() => {}}
+          onOtherPlace={() => {}}
           timeError={errors.time}
           placeError={errors.place}
         />
-      )}
-
-      {mode === "counter" && (
-        <p className="-mt-2 text-sm text-muted">
-          Pick an option or add your own — for the time, the place, or both.
-        </p>
       )}
 
       {/* The author's choice about the bill, as on the plan later.
@@ -298,6 +348,19 @@ export function InviteResponseForm({
           rows={3}
           className={`${fieldStyle} resize-none`}
         />
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {MESSAGE_TEMPLATES[mode].map((template) => (
+            <button
+              key={template}
+              type="button"
+              onClick={() => setMessage(template)}
+              className="rounded-full border border-dashed border-line px-2.5 py-1.5 text-xs text-muted"
+            >
+              {template}
+            </button>
+          ))}
+        </div>
+
         <p className="mt-1.5 self-end text-xs text-quiet">
           {RESPONSE_MESSAGE_MAX_LENGTH - message.length} characters left
         </p>
