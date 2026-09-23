@@ -11,6 +11,10 @@ type ShareMenuProps = {
   hint?: string; // a line above the button until something is picked
   // "main": the big pink button. "quiet": an outlined secondary button.
   variant?: "main" | "quiet";
+  // Adds the sender's time zone to the link ("?tz=Europe/Kyiv"), so the
+  // preview picture can show the time. The server does not know any zone,
+  // and a friend is usually in the same city as the sender.
+  withTimeZone?: boolean;
 };
 
 const BUTTON_STYLES = {
@@ -35,12 +39,15 @@ export function ShareMenu({
   buttonLabel,
   hint,
   variant = "main",
+  withTimeZone = false,
 }: ShareMenuProps) {
   // The site address and the phone share menu exist only in the browser.
-  const fullLink = useBrowserValue<string | null>(
-    () => `${window.location.origin}${path}`,
-    null,
-  );
+  const fullLink = useBrowserValue<string | null>(() => {
+    const link = `${window.location.origin}${path}`;
+    if (!withTimeZone) return link;
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return `${link}${path.includes("?") ? "&" : "?"}tz=${encodeURIComponent(zone)}`;
+  }, null);
   const canUseSystemShare = useBrowserValue(
     () => typeof navigator.share === "function",
     false,

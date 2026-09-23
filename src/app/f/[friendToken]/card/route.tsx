@@ -3,9 +3,9 @@ import { getFriendCard } from "@/lib/friendCard";
 
 // The picture a messenger shows under the friend's link.
 // Calm on purpose: a plain card, no gradient, no emoji.
-export const alt = "A date plan from Date Helper";
-export const size = { width: 1200, height: 630 };
-export const contentType = "image/png";
+// A route, not an opengraph-image file: it needs the time zone from the
+// address ("?tz=Europe/Kyiv"), and an opengraph-image file cannot read it.
+const size = { width: 1200, height: 630 };
 
 // Colors from the mockup. A picture, not HTML: only inline styles.
 const COLORS = {
@@ -16,13 +16,13 @@ const COLORS = {
   muted: "#8A8A8A",
 };
 
-export default async function Image({
-  params,
-}: {
-  params: Promise<{ friendToken: string }>;
-}) {
-  const { friendToken } = await params;
-  const card = (await getFriendCard(friendToken)) ?? {
+export async function GET(
+  request: Request,
+  context: RouteContext<"/f/[friendToken]/card">,
+) {
+  const { friendToken } = await context.params;
+  const timeZone = new URL(request.url).searchParams.get("tz");
+  const card = (await getFriendCard(friendToken, timeZone)) ?? {
     title: "Date plan",
     subtitle: "Open to see the plan",
   };

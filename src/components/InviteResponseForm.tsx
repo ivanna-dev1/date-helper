@@ -59,7 +59,7 @@ const errorStyle = "mt-1 text-xs text-accent";
 
 // The text on the main button changes with the mode.
 const SUBMIT_LABELS: Record<Mode, string> = {
-  yes: "Works for me!",
+  yes: "Accept",
   counter: "Send my suggestion",
   no: "Send my answer",
 };
@@ -84,7 +84,7 @@ export function InviteResponseForm({
   const whoPaysText = getWhoPaysText(whoPays, authorName, "", "guest");
 
   // When there is only one option, there is nothing to choose: it is
-  // picked from the start, so "Works for me!" is the only click needed.
+  // picked from the start, so "Accept" is the only click needed.
   const onlyTime: Choice = times.length === 1 ? times[0].id : null;
   const onlyPlace: Choice = places.length === 1 ? places[0].id : null;
 
@@ -298,6 +298,9 @@ export function InviteResponseForm({
           rows={3}
           className={`${fieldStyle} resize-none`}
         />
+        <p className="mt-1.5 self-end text-xs text-quiet">
+          {RESPONSE_MESSAGE_MAX_LENGTH - message.length} characters left
+        </p>
         {errors.message && <p className={errorStyle}>{errors.message}</p>}
       </div>
 

@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { InviteStatus } from "@/generated/prisma/enums";
 
 // The text of the preview for the friend's link. Calm, like the page:
-// no emoji, no playful words. No time: see the note in the page file.
+// no emoji, no playful words.
 export type FriendCard = {
   tag: string; // goes into the picture address, changes with the plan
   title: string;
@@ -12,8 +12,13 @@ export type FriendCard = {
 
 // Needed twice for one link (the <meta> tags and the picture):
 // cache() asks the database once per request.
+// The time is shown only when the link carries the sender's time zone
+// ("?tz=Europe/Kyiv"): the server itself does not know any zone.
 export const getFriendCard = cache(
-  async (friendToken: string): Promise<FriendCard | null> => {
+  async (
+    friendToken: string,
+    timeZone: string | null,
+  ): Promise<FriendCard | null> => {
     // Only what the preview shows. No tokens, no messages.
     const invite = await prisma.invite.findUnique({
       where: { friendToken },
@@ -24,7 +29,9 @@ export const getFriendCard = cache(
         response: {
           select: {
             respondentName: true,
+            proposedTime: true,
             proposedPlace: true,
+            chosenTime: { select: { startsAt: true } },
             chosenPlace: { select: { name: true } },
           },
         },
@@ -44,12 +51,13 @@ export const getFriendCard = cache(
     }
     if (invite.status === InviteStatus.CONFIRMED && response) {
       const place = response.proposedPlace ?? response.chosenPlace?.name;
+      const time = response.proposedTime ?? response.chosenTime?.startsAt;
+      const timeText = time ? formatInZone(time, timeZone) : null;
+      const parts = [timeText, place].filter(Boolean);
       return {
         tag: `plan-${version}`,
         title: `Date plan: ${invite.authorName} and ${response.respondentName}`,
-        subtitle: place
-          ? `At ${place}. Open to see the time`
-          : "Open to see the time and place",
+        subtitle: parts.length > 0 ? parts.join(" · ") : "Open to see the plan",
       };
     }
     return {
@@ -59,3 +67,21 @@ export const getFriendCard = cache(
     };
   },
 );
+
+// "Sat, Oct 10, 6:00 PM" in the given zone, or null when the zone is
+// missing or not a real one (a link can be changed by hand).
+function formatInZone(time: Date, timeZone: string | null): string | null {
+  if (!timeZone) return null;
+  try {
+    return time.toLocaleString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      timeZone,
+    });
+  } catch {
+    return null;
+  }
+}

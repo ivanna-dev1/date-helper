@@ -81,6 +81,7 @@ export function DatePlan({
           and not loud for everyone else. */}
       <ShareMenu
         path={friendPath}
+        withTimeZone
         text="Here are the details of my date, just so you know where I am"
         buttonLabel="Let a friend know where I am"
         variant="quiet"

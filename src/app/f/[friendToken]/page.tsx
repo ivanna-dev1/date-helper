@@ -6,14 +6,16 @@ import { LocalDateTime } from "@/components/LocalDateTime";
 import { RESPONSE_VIEW_SELECT, toSentAnswer } from "@/lib/responseView";
 import { getFriendCard } from "@/lib/friendCard";
 
-// The messenger preview. It says whose plan it is and where, but not when:
-// the picture is drawn on the server, which does not know the friend's
-// time zone, so a time there could be hours off. The page shows the time.
+// The messenger preview: whose plan it is, when and where. The picture is
+// drawn on the server, which knows no time zone, so the link carries the
+// sender's zone ("?tz=Europe/Kyiv"). Without it the time is left out.
 export async function generateMetadata(
   props: PageProps<"/f/[friendToken]">,
 ): Promise<Metadata> {
   const { friendToken } = await props.params;
-  const card = await getFriendCard(friendToken);
+  const { tz } = await props.searchParams;
+  const timeZone = typeof tz === "string" ? tz : null;
+  const card = await getFriendCard(friendToken, timeZone);
   const title = card?.title ?? "Date plan";
   const description = card?.subtitle ?? "Open to see the plan";
 
@@ -28,7 +30,9 @@ export async function generateMetadata(
       images: card
         ? [
             {
-              url: `/f/${friendToken}/opengraph-image?state=${card.tag}`,
+              url: `/f/${friendToken}/card?state=${card.tag}${
+                timeZone ? `&tz=${encodeURIComponent(timeZone)}` : ""
+              }`,
               width: 1200,
               height: 630,
               alt: "A date plan from Date Helper",

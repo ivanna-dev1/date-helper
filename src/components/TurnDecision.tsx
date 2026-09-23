@@ -194,6 +194,9 @@ export function TurnDecision({
         rows={2}
         className={`${fieldStyle} resize-none`}
       />
+      <span className="self-end text-xs text-quiet">
+        {RESPONSE_MESSAGE_MAX_LENGTH - message.length} characters left
+      </span>
     </label>
   );
 
