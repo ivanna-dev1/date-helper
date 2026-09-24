@@ -2,6 +2,7 @@
 
 import { useId, useState } from "react";
 import { SHARE_TARGETS } from "@/lib/shareTargets";
+import { getShareOrigin } from "@/lib/siteUrl";
 import { useBrowserValue } from "@/hooks/useBrowserValue";
 
 type ShareMenuProps = {
@@ -43,7 +44,7 @@ export function ShareMenu({
 }: ShareMenuProps) {
   // The site address and the phone share menu exist only in the browser.
   const fullLink = useBrowserValue<string | null>(() => {
-    const link = `${window.location.origin}${path}`;
+    const link = `${getShareOrigin()}${path}`;
     if (!withTimeZone) return link;
     const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     return `${link}${path.includes("?") ? "&" : "?"}tz=${encodeURIComponent(zone)}`;
