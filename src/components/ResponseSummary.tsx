@@ -22,9 +22,6 @@ type ResponseSummaryProps = {
   // The author's turn link. The invited person sends it after a suggestion,
   // so the author can answer from it. Empty before any suggestion.
   turnToken: string | null;
-  // true right after sending. false when the link is opened again:
-  // then the author has most likely been told already.
-  isJustSent: boolean;
   // Changes with every move (made from the time of the last change).
   // It goes into the shared address, so a messenger makes a fresh preview
   // for every move and does not show the old one from its memory.
@@ -64,7 +61,10 @@ const HEADINGS: Record<
 // What the invited person sends to the author, and by which link.
 // After a suggestion the link is the author's turn link, so the author
 // can answer from it; otherwise the author gets the invitation link.
-function getShare(outcome: AnswerOutcome, byGuest: boolean): { text: string; toTurnLink: boolean } | null {
+function getShare(
+  outcome: AnswerOutcome,
+  byGuest: boolean,
+): { text: string; toTurnLink: boolean } | null {
   // A suggestion waits for the author: the link stays useful, so the button
   // stays too, also when the page is opened again.
   if (outcome === "suggested") {
@@ -104,7 +104,6 @@ export function ResponseSummary({
   guestName,
   lastWords,
   turnToken,
-  isJustSent,
   shareVersion,
   isAuthorBrowser = false,
 }: ResponseSummaryProps) {
@@ -128,7 +127,9 @@ export function ResponseSummary({
       path={sharePath}
       text={share.text}
       buttonLabel={`Let ${authorName} know`}
-      hint={isJustSent ? `${authorName} doesn't know yet` : undefined}
+      // The hint stays until this person picks a messenger: nobody tells
+      // the author for us, and the page may be opened again days later.
+      hint={`${authorName} doesn't know yet`}
     />
   ) : null;
 

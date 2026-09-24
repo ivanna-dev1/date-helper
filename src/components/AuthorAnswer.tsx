@@ -103,6 +103,7 @@ export function AuthorAnswer({
       path={`${publicPath}?s=${outcome}-${shareVersion}`}
       text={shareText}
       buttonLabel={`Let ${respondentName} know`}
+      hint={`${respondentName} doesn't know yet`}
     />
   ) : null;
 

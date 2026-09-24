@@ -165,7 +165,6 @@ export default async function InvitePage(props: PageProps<"/i/[token]">) {
             response.message,
           )}
           turnToken={invite.turnToken}
-          isJustSent={false}
           shareVersion={invite.updatedAt.getTime().toString(36)}
           isAuthorBrowser={(await getBrowserRole(token)) === "author"}
         />

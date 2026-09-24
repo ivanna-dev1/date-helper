@@ -258,7 +258,6 @@ export function InviteResponseForm({
           message.trim() ? { by: "guest", text: message.trim() } : null
         }
         turnToken={turnToken}
-        isJustSent
       />
     );
   }
