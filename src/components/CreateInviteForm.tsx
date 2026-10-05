@@ -19,8 +19,7 @@ import {
 import { DATE_FORMATS, FORMAT_ORDER } from "@/lib/dateFormats";
 import { toUtcString } from "@/lib/time";
 
-// Ready-made lines, so the author does not stare at an empty field.
-// They depend on the format: a movie hint next to "Coffee" would feel wrong.
+// Ready-made lines; they depend on the format.
 const MESSAGE_TEMPLATES: Record<DateFormat, string[]> = {
   [DateFormat.COFFEE]: [
     "Coffee this weekend?",
@@ -49,7 +48,6 @@ const MESSAGE_TEMPLATES: Record<DateFormat, string[]> = {
   ],
 };
 
-// This field is optional and should stay quiet on the screen.
 const WHO_PAYS_OPTIONS = [
   { value: WhoPays.MY_TREAT, label: "My treat" },
   { value: WhoPays.SPLIT, label: "Split it" },
@@ -58,13 +56,13 @@ const WHO_PAYS_OPTIONS = [
 
 type TimeDraft = {
   id: string;
-  value: string; // "2026-09-12T18:00", the format of <input type="datetime-local">
+  value: string;
 };
 
 type PlaceDraft = {
   id: string;
   name: string;
-  note: string; // optional hint, for example "by the entrance"
+  note: string;
 };
 
 function createTimeDraft(): TimeDraft {
@@ -75,7 +73,6 @@ function createPlaceDraft(): PlaceDraft {
   return { id: crypto.randomUUID(), name: "", note: "" };
 }
 
-// Shared styles. We keep them in one place so all fields look the same.
 const labelStyle =
   "mb-1.5 text-xs font-medium uppercase tracking-wide text-muted";
 const fieldStyle =
@@ -89,14 +86,10 @@ export function CreateInviteForm() {
   const [authorName, setAuthorName] = useState("");
   const [message, setMessage] = useState("");
   const [format, setFormat] = useState<DateFormat>(DateFormat.COFFEE);
-  // null means the author did not choose — that is a valid answer here.
   const [whoPays, setWhoPays] = useState<WhoPays | null>(null);
   const [expiryDays, setExpiryDays] = useState(DEFAULT_EXPIRY_DAYS);
 
-  // The date is counted from "today", and today on the server can differ
-  // from today in the browser (different time zones). If we rendered it
-  // right away, the server HTML and the browser HTML would not match.
-  // So we show the date only after the component is in the browser.
+  // Server and browser disagree on "today": render the date after mount to avoid a hydration mismatch.
   const expiryDate = useBrowserValue<string | null>(() => {
     const date = new Date();
     date.setDate(date.getDate() + expiryDays);
@@ -110,14 +103,10 @@ export function CreateInviteForm() {
 
   const [isSaving, setIsSaving] = useState(false);
   const [errors, setErrors] = useState<InviteErrors>({});
-  // A second lock next to isSaving. State changes only on the next render,
-  // so two very fast clicks could both see isSaving === false and create
-  // two invitations. A ref changes at once, so the second click stops here.
+  // A ref blocks a double click at once; state updates only on the next render.
   const isSavingRef = useRef(false);
 
-  // Without preventDefault the browser does its old default: it reloads the
-  // page and puts the form fields into the address bar. Private data must
-  // never go into a URL.
+  // preventDefault: otherwise the fields would end up in the URL.
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (isSavingRef.current) return;
@@ -133,8 +122,7 @@ export function CreateInviteForm() {
         format,
         whoPays,
         expiryDays,
-        // Turn local time into UTC here, in the browser. Only the browser
-        // knows the author's time zone. The server may run in another one.
+        // Only the browser knows the author's time zone.
         times: times.items.map((time) => toUtcString(time.value)),
         places: places.items.map((place) => ({
           name: place.name,
@@ -142,8 +130,6 @@ export function CreateInviteForm() {
         })),
       });
 
-      // On success the server redirects to the author page, so we get a
-      // result only when something is wrong.
       if (result) {
         hasErrors = true;
         setErrors(result.errors);
@@ -152,8 +138,6 @@ export function CreateInviteForm() {
       hasErrors = true;
       throw error;
     } finally {
-      // After success the page is about to change, so the button stays
-      // locked. Only a problem unlocks it, so the author can fix and retry.
       if (hasErrors) {
         isSavingRef.current = false;
         setIsSaving(false);
@@ -366,8 +350,6 @@ export function CreateInviteForm() {
         )}
       </fieldset>
 
-      {/* Quiet on purpose: small, grey, no caps. It should be easy to find
-          but must not pull attention away from the main fields. */}
       <fieldset className="flex flex-col border-0 p-0">
         <legend className="mb-1.5 text-xs text-quiet">
           Who pays? — optional
@@ -380,7 +362,6 @@ export function CreateInviteForm() {
               <button
                 key={option.value}
                 type="button"
-                // Clicking the active one clears it, so "no answer" stays reachable.
                 onClick={() => setWhoPays(isActive ? null : option.value)}
                 aria-pressed={isActive}
                 className={`rounded-xl border px-2.5 py-1.5 text-xs ${

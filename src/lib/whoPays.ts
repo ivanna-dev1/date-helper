@@ -1,12 +1,9 @@
 import { WhoPays } from "@/generated/prisma/enums";
 
-// Who looks at the page: the author or the invited person.
-// "My treat" means different words for each of them.
+// "My treat" reads differently for the author and the invited person.
 export type Viewer = "author" | "guest";
 
-// A short quiet line about the bill, or null when nobody chose
-// (then we show nothing).
-// MY_TREAT means the author pays, GUEST_TREAT — the invited person.
+// A quiet line about the bill, or null when nobody chose.
 export function getWhoPaysText(
   whoPays: WhoPays | null,
   authorName: string,
@@ -31,10 +28,8 @@ export function getWhoPaysText(
   }
 }
 
-// The same choice seen from the person who is choosing: "me" is always
-// "I pay", whoever I am. "other" is the other person's own offer to pay
-// ("Olia's treat"). It is a chip only when that person offered it: asking
-// the other person to pay feels rude on a date — "Decide later" covers that.
+// From the chooser's side: "me" is always "I pay"; "other" is the other person's own offer.
+// Never ask them to pay: "Decide later" covers that.
 export type PayChoice = "me" | "other" | "split" | "later" | null;
 
 export function toWhoPays(choice: PayChoice, viewer: Viewer): WhoPays | null {
@@ -49,8 +44,7 @@ export function toWhoPays(choice: PayChoice, viewer: Viewer): WhoPays | null {
   return null;
 }
 
-// The forms send who pays only after a click on a chip, so it is not wiped
-// by someone who only changes the place.
+// Sent only after a chip click, so changing the place does not wipe it.
 export function toPayChoice(
   whoPays: WhoPays | null,
   viewer: Viewer,
@@ -63,9 +57,7 @@ export function toPayChoice(
   return null;
 }
 
-// The chips, in the order people see them. A click on the picked one
-// clears it: not choosing is fine too. `otherName` adds the other person's
-// offer ("Olia's treat") — only when they offered it themselves.
+// Chips in display order; clicking the picked one clears it. otherName adds the other person's own offer.
 export function getPayChoices(
   otherName: string | null,
 ): { value: Exclude<PayChoice, null>; label: string }[] {

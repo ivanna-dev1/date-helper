@@ -34,8 +34,7 @@ import {
 } from "@/generated/prisma/enums";
 import { Prisma } from "@/generated/prisma/client";
 
-// We return something only when the data is wrong.
-// When everything is fine, the action redirects and never returns.
+// Returns something only on errors; success redirects.
 export type CreateInviteResult = { errors: InviteErrors };
 
 export async function createInvite(
@@ -53,8 +52,6 @@ export async function createInvite(
   const times = input.times.filter((time) => time !== "");
   const places = input.places.filter((place) => place.name.trim() !== "");
 
-  // One nested create. Prisma wraps it in a transaction on its own:
-  // either the invite and all its options are saved, or nothing is.
   const invite = await prisma.invite.create({
     data: {
       publicToken: createToken(),
@@ -66,8 +63,7 @@ export async function createInvite(
       whoPays: input.whoPays,
       expiresAt,
       timeOptions: {
-        // Times come as UTC strings with a zone ("...Z"), so new Date()
-        // gives the same moment on any server, in any time zone.
+        // UTC strings with a zone: the same moment on any server.
         create: times.map((time) => ({ startsAt: new Date(time) })),
       },
       placeOptions: {
@@ -79,24 +75,17 @@ export async function createInvite(
     },
   });
 
-  // This browser is the author's now: it must not answer this invitation
-  // as the invited person by mistake.
+  // This browser is now the author's: it must not answer as the guest.
   await rememberBrowserRole(invite.publicToken, "author");
 
-  // redirect() throws a special error that Next.js catches.
-  // Code after this line never runs.
   redirect(`/manage/${invite.secretToken}`);
 }
 
-// Two shapes of answer: saved, or a list of problems.
-// turnToken comes back after a suggestion: the guest sends it to the author,
-// so the author can answer from that link.
+// turnToken comes back after a suggestion so the author can answer from that link.
 export type SubmitResponseResult =
   | {
       ok: true;
       turnToken: string | null;
-      // The saved options of a suggestion, so the screen can show them
-      // right away (they get their ids only in the database).
       choices: {
         times: { id: number; startsAt: string }[];
         places: { id: number; name: string; note: string | null }[];
@@ -104,7 +93,6 @@ export type SubmitResponseResult =
     }
   | { ok: false; errors: ResponseErrors };
 
-// Which invitation status each kind of answer leads to.
 const STATUS_BY_TYPE: Record<ResponseType, InviteStatus> = {
   [ResponseType.YES]: InviteStatus.CONFIRMED,
   [ResponseType.NO]: InviteStatus.DECLINED,
@@ -123,7 +111,6 @@ const CANCELLED_MESSAGE = "This invitation was cancelled";
 export async function submitResponse(
   input: SubmitResponseInput,
 ): Promise<SubmitResponseResult> {
-  // Only the ids of the options: we need them to check the answer.
   const invite = await prisma.invite.findUnique({
     where: { publicToken: input.token },
     select: {
@@ -145,7 +132,6 @@ export async function submitResponse(
     return { ok: false, errors: { form: CANCELLED_MESSAGE } };
   }
 
-  // The author opened their own link, for example to see how it looks.
   if ((await getBrowserRole(input.token)) === "author") {
     return {
       ok: false,
@@ -155,14 +141,11 @@ export async function submitResponse(
     };
   }
 
-  // The page already hides the form for an old invitation,
-  // but a direct request could still come here.
+  // Direct requests can bypass the hidden form.
   if (invite.expiresAt < new Date()) {
     return { ok: false, errors: { form: "This invitation has expired" } };
   }
 
-  // One invitation gets one answer. This check gives a clear message
-  // in the usual case: the person opens the link again and answers twice.
   if (invite.response) {
     return { ok: false, errors: { form: ALREADY_ANSWERED } };
   }
@@ -180,29 +163,19 @@ export async function submitResponse(
   const isNo = input.type === ResponseType.NO;
   const isCounter = input.type === ResponseType.COUNTER;
 
-  // A suggestion keeps its options in their own rows, like every later
-  // move does. The answer itself then holds no time and no place.
   const times = isCounter ? cleanTimes(input.proposedTimes) : [];
   const places = isCounter ? cleanPlaces(input.proposedPlaces) : [];
-  // A suggestion may also change who pays. Not given = keep the author's.
   const whoPaysChange =
     isCounter && input.whoPays !== undefined ? { whoPays: input.whoPays } : {};
 
-  // "Yes" picks one of the author's options. For "no" nothing is picked.
   const timeId = isNo || isCounter ? null : input.timeId;
   const placeId = isNo || isCounter ? null : input.placeId;
 
-  // A suggestion starts the back-and-forth: the author gets a fresh link.
   const turnToken = isCounter ? createToken() : null;
-  // Filled after the write: the options with the ids the database gave them.
   let savedChoices: (SubmitResponseResult & { ok: true })["choices"] = null;
 
   try {
-    // One nested write again: the answer and the new status of the
-    // invitation are saved together, or not at all.
-    // `status: PENDING` in `where`: the answer is saved only if the invite
-    // still waits for it. If the author cancelled it a moment ago,
-    // Prisma finds no row and throws P2025.
+    // `status: PENDING` makes the write fail (P2025) if the author cancelled meanwhile.
     const saved = await prisma.invite.update({
       where: { id: invite.id, status: InviteStatus.PENDING },
       data: {
@@ -241,10 +214,7 @@ export async function submitResponse(
         }
       : null;
   } catch (error) {
-    // The check above is not enough on its own. Two answers can come at the
-    // same moment (from a phone and a laptop). Both pass the check, because
-    // neither is saved yet. The database stops the second one: `inviteId`
-    // in Response is @unique. We turn that error into the same message.
+    // Two simultaneous answers both pass the check above; @unique on inviteId stops the second.
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === UNIQUE_CONSTRAINT_FAILED
@@ -257,7 +227,6 @@ export async function submitResponse(
     ) {
       return { ok: false, errors: { form: CANCELLED_MESSAGE } };
     }
-    // Any other error is unexpected, so we let it go up.
     throw error;
   }
 
@@ -265,9 +234,7 @@ export async function submitResponse(
   return { ok: true, turnToken, choices: savedChoices };
 }
 
-// Who is acting, and by which link. The link decides the rights:
-// the secret link and the turn link act for the author,
-// the public link acts for the guest.
+// The link decides the rights: secret and turn links act as the author, the public link as the guest.
 export type TurnKey =
   | { kind: "secret"; token: string }
   | { kind: "turn"; token: string }
@@ -276,16 +243,11 @@ export type TurnKey =
 export type TurnInput = {
   key: TurnKey;
   decision: "accept" | "decline" | "counter";
-  // Only for "counter": the new times (UTC with a zone) and places with
-  // their hints — one or more of each, so the other person can pick.
-  // Who pays: left out = keep as it is.
   proposedTimes?: string[];
   proposedPlaces?: { name: string; note: string }[];
   whoPays?: WhoPays | null;
-  // Only for "accept" of a move with a choice: the picked options.
   timeId?: number | null;
   placeId?: number | null;
-  // A few words with any move. Only the latest words are kept.
   message?: string;
 };
 
@@ -302,7 +264,6 @@ function whereByKey(key: TurnKey) {
 
 type NewPlace = { name: string; note: string };
 
-// Checks the options of a new move. Returns an error text, or null.
 function checkTurnOptions(times: string[], places: NewPlace[]): string | null {
   if (times.length === 0) return "Add a time";
   if (times.length > MAX_TIME_OPTIONS) {
@@ -327,8 +288,6 @@ function checkTurnOptions(times: string[], places: NewPlace[]): string | null {
   return null;
 }
 
-// The data of the invitation that a move needs, loaded inside the move's
-// transaction.
 const TURN_TARGET_SELECT = {
   id: true,
   whoPays: true,
@@ -351,9 +310,7 @@ type TurnTarget = Prisma.InviteGetPayload<{
   select: typeof TURN_TARGET_SELECT;
 }>;
 
-// The agreed time and place, written into the answer. One of the author's
-// first options? Then we link it, not copy its text: the author's hint
-// ("by the entrance") stays with the place.
+// Link one of the author's options instead of copying it, so its hint stays.
 function toAgreedData(
   target: TurnTarget,
   time: Date,
@@ -363,8 +320,7 @@ function toAgreedData(
   const timeOption = target.timeOptions.find(
     (option) => option.startsAt.getTime() === time.getTime(),
   );
-  // Only when the hint is the author's too (or empty): a new hint makes
-  // it the person's own place.
+  // A new hint makes it the person's own place.
   const placeOption = target.placeOptions.find(
     (option) =>
       option.name.toLowerCase() === place.name.toLowerCase() &&
@@ -383,19 +339,12 @@ function toAgreedData(
   };
 }
 
-/**
- * One move in the back-and-forth: accept, decline, or suggest something else.
- *
- * Only the person who did NOT make the latest suggestion may answer it.
- * The check and the change happen in one conditional update, so two
- * clicks at the same moment (two phones) cannot both win.
- * Only the latest suggestion is kept: a new one replaces the old one.
- */
+// Only the person who did not make the latest suggestion may answer. Check and change are one
+// conditional update, so two clicks cannot both win.
 export async function answerTurn(input: TurnInput): Promise<TurnResult> {
   const actor = input.key.kind === "public" ? Party.GUEST : Party.AUTHOR;
 
-  // The suggestion must come from the other person. Old invitations have
-  // no value here: then the guest made it, so the author may answer.
+  // Old invitations have no value: the guest made it.
   const madeByOther =
     actor === Party.AUTHOR
       ? { OR: [{ lastProposedBy: Party.GUEST }, { lastProposedBy: null }] }
@@ -407,8 +356,7 @@ export async function answerTurn(input: TurnInput): Promise<TurnResult> {
     ...madeByOther,
   };
 
-  // The browser's side of this date. The secret link is the author's
-  // own page and proves the side by itself, so it is not checked.
+  // The secret link proves the author's side by itself.
   const role = actor === Party.GUEST ? "guest" : "author";
   const people =
     input.key.kind === "secret"
@@ -424,7 +372,6 @@ export async function answerTurn(input: TurnInput): Promise<TurnResult> {
   if (people) {
     const browserRole = await getBrowserRole(people.publicToken);
     if (browserRole !== null && browserRole !== role) {
-      // The other person's name: the one this link must go to.
       const other =
         role === "guest" ? people.response?.respondentName : people.authorName;
       return {
@@ -433,14 +380,11 @@ export async function answerTurn(input: TurnInput): Promise<TurnResult> {
       };
     }
   }
-  // Called after a move is saved.
   async function rememberRole() {
     if (people) await rememberBrowserRole(people.publicToken, role);
   }
 
-  // The words go with the move and replace the ones before. lastMessageBy is
-  // set even without words: it marks that the talk moved on, so older words
-  // (for example from the first answer) are not shown as the latest.
+  // lastMessageBy is set even without words, so older words are not shown as the latest.
   const message = (input.message ?? "").trim();
   if (message.length > RESPONSE_MESSAGE_MAX_LENGTH) {
     return {
@@ -463,8 +407,6 @@ export async function answerTurn(input: TurnInput): Promise<TurnResult> {
   }
 
   if (input.decision === "accept") {
-    // A move with options: the picked ones become the plan. The status,
-    // the plan and the removal of the options happen together.
     const result = await prisma.$transaction(async (tx) => {
       const target = await tx.invite.findFirst({
         where,
@@ -473,10 +415,8 @@ export async function answerTurn(input: TurnInput): Promise<TurnResult> {
       if (!target) return null;
 
       const { turnTimes, turnPlaces } = target;
-      // Old invitations in the middle of a talk have no option rows: then
-      // the plan is already in the answer, and only the status changes.
+      // Old invitations have no option rows: the plan is already in the answer.
       const hasOptions = turnTimes.length > 0 && turnPlaces.length > 0;
-      // One option is picked by itself; from several, the person picks.
       const time =
         turnTimes.length === 1
           ? turnTimes[0]
@@ -513,8 +453,6 @@ export async function answerTurn(input: TurnInput): Promise<TurnResult> {
     return { ok: true, turnToken: null };
   }
 
-  // A new suggestion: check it like any other suggestion. Empty rows are
-  // dropped, and the same time or place twice counts once.
   const times = cleanTimes(input.proposedTimes ?? []);
   const places = cleanPlaces(input.proposedPlaces ?? []);
   const optionsError = checkTurnOptions(times, places);
@@ -531,12 +469,9 @@ export async function answerTurn(input: TurnInput): Promise<TurnResult> {
 
   const newTimes = times.map((time) => new Date(time));
 
-  // The author's turn link stays the same when the author moves (it is
-  // their door). A new guest move gives the author a fresh link.
+  // The author's turn link stays when the author moves; a guest move makes a fresh one.
   const newTurnToken = actor === Party.GUEST ? createToken() : null;
 
-  // Several writes that must happen together, so they run in one
-  // transaction: all, or none.
   const invite = await prisma.$transaction(async (tx) => {
     const target = await tx.invite.findFirst({
       where,
@@ -544,8 +479,6 @@ export async function answerTurn(input: TurnInput): Promise<TurnResult> {
     });
     if (!target || !target.response) return null;
 
-    // What is on the table now: the options of the latest move, or, before
-    // any move, the first suggestion from the answer.
     const current = target.response;
     const hasOptions =
       target.turnTimes.length > 0 && target.turnPlaces.length > 0;
@@ -565,8 +498,7 @@ export async function answerTurn(input: TurnInput): Promise<TurnResult> {
         ? [{ name: currentPlace, note: currentNote ?? null }]
         : [];
 
-    // The same options as now are not a new suggestion:
-    // for that there is "Accept".
+    // The same options as now is not a new suggestion (use "Accept").
     const newWhoPays =
       input.whoPays === undefined ? target.whoPays : input.whoPays;
     if (
@@ -588,8 +520,6 @@ export async function answerTurn(input: TurnInput): Promise<TurnResult> {
     });
     if (count === 0) return null;
 
-    // The new options replace the old ones. The answer's own values are
-    // cleared: from now on the options say what is on the table.
     await tx.turnTime.deleteMany({ where: { inviteId: target.id } });
     await tx.turnPlace.deleteMany({ where: { inviteId: target.id } });
     await tx.turnTime.createMany({
@@ -628,9 +558,6 @@ export async function answerTurn(input: TurnInput): Promise<TurnResult> {
   return { ok: true, turnToken: newTurnToken };
 }
 
-// The author can cancel while the date is still possible: before an answer,
-// while a suggestion waits, or after "yes". After "no" there is nothing
-// to cancel.
 const CANCELLABLE_STATUSES: InviteStatus[] = [
   InviteStatus.PENDING,
   InviteStatus.COUNTER,
@@ -642,14 +569,11 @@ export type CancelInviteResult = { ok: true } | { ok: false; error: string };
 export async function cancelInvite(
   secretToken: string,
 ): Promise<CancelInviteResult> {
-  // The same conditional update as in answerSuggestion:
-  // the check and the change happen in one query.
   const { count } = await prisma.invite.updateMany({
     where: { secretToken, status: { in: CANCELLABLE_STATUSES } },
     data: { status: InviteStatus.CANCELLED },
   });
 
-  // Show the fresh status in any case.
   refresh();
 
   if (count === 0) {

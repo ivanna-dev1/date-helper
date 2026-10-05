@@ -14,25 +14,19 @@ type AuthorAnswerProps = {
   respondentName: string;
   authorName: string;
   whoPays: WhoPays | null;
-  lastWords: LastWords | null; // the latest few words of the back-and-forth
-  // The author's key for answering: the secret link or the turn link.
+  lastWords: LastWords | null;
   turnKey: TurnKey;
-  friendToken: string; // for "Let a friend know where I am"
-  publicPath: string; // the invited person's link, "/i/k7Fq2mXp9RtA"
-  // Changes with every move, so a messenger makes a fresh preview each time.
+  friendToken: string;
+  publicPath: string;
+  // Changes each move so messengers refetch the preview.
   shareVersion: string;
-  // true when this browser is the invited person's: they opened the turn
-  // link they sent. Then there are no answer buttons, only a hint.
   isGuestBrowser?: boolean;
 };
 
-// What the author sees for each outcome. No hearts, like elsewhere.
-// `byGuest` tells who made the latest suggestion.
 const HEADINGS: Record<
   AnswerOutcome,
   { emoji: string; title: (name: string, byGuest: boolean) => string }
 > = {
-  // An agreed date has the same heading for both people.
   yes: { emoji: "🎉", title: () => "It's a date!" },
   no: { emoji: "🌷", title: (name) => `${name} can't this time` },
   suggested: {
@@ -53,13 +47,10 @@ const HEADINGS: Record<
   },
 };
 
-// The invited person does not know the author's move yet. The author tells
-// them the same way: a message with the invited person's own link.
 function getShareText(outcome: AnswerOutcome, byGuest: boolean) {
   if (outcome === "authorSuggested") {
     return "I suggested another option — what do you say? 📨";
   }
-  // Only the author's own decision is news for the invited person.
   if (!byGuest) return undefined;
   if (outcome === "suggestionAccepted") {
     return "I said yes to your suggestion! 🎉";
@@ -70,7 +61,6 @@ function getShareText(outcome: AnswerOutcome, byGuest: boolean) {
   return undefined;
 }
 
-// The answer, shown on the author's page (and on the author's turn link).
 export function AuthorAnswer({
   answer,
   respondentName,
@@ -96,8 +86,7 @@ export function AuthorAnswer({
   );
   const isAgreed = outcome === "yes" || outcome === "suggestionAccepted";
 
-  // The tag changes the address, so the messenger loads a fresh preview
-  // instead of the one it remembered for this link.
+  // The tag changes the URL so messengers refetch the preview.
   const shareMenu = shareText ? (
     <ShareMenu
       path={`${publicPath}?s=${outcome}-${shareVersion}`}
@@ -111,8 +100,6 @@ export function AuthorAnswer({
     <section className="animate-card-in flex flex-col items-center gap-6 rounded-2xl border border-line bg-surface px-5 py-8 text-center">
       <h2 className="text-2xl font-bold text-ink">
         {heading.title(respondentName, byGuest)}
-        {/* The emoji ends the heading line. A non-breaking space keeps it
-            next to the last word. aria-hidden: it is only decoration. */}
         {" "}
         <span aria-hidden="true">{heading.emoji}</span>
       </h2>
@@ -128,8 +115,6 @@ export function AuthorAnswer({
         </p>
       )}
 
-      {/* The date is agreed: the same plan as the invited person sees. */}
-      {/* The latest words go before the buttons, so they are read first. */}
       {isAgreed && (
         <LastMessage
           words={lastWords}
@@ -146,19 +131,15 @@ export function AuthorAnswer({
           invitePath={publicPath}
           friendPath={`/f/${friendToken}`}
           eventTitle={`Date with ${respondentName}`}
-          // The invited person does not know the decision yet,
-          // so this button stands first under the plan.
           notifyButton={shareMenu}
         />
       )}
 
-      {/* A suggestion on the table: who made it decides the note. */}
       {outcome === "suggested" && (
         <AnswerDetails
           answer={answer}
           ownNote={`(${respondentName}'s idea)`}
           whoPaysText={whoPaysText}
-          // The choice cards below show the options.
           hideChoices
         />
       )}

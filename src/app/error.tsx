@@ -1,20 +1,16 @@
-"use client"; // Error screens must be client components (Next.js rule).
+"use client";
 
 import { useEffect } from "react";
 import Link from "next/link";
 
 type ErrorPageProps = {
   error: Error & { digest?: string };
-  retry: () => void; // renders the page again
+  retry: () => void;
 };
 
-// Shown when something breaks that we did not expect, for example
-// the database does not answer. The person gets a calm message and a way
-// to try again, not a white screen.
 export default function ErrorPage({ error, retry }: ErrorPageProps) {
   useEffect(() => {
-    // The details go to the console only, never to the screen:
-    // they can contain things a visitor should not see.
+    // Details go to the console only; they may be sensitive.
     console.error(error);
   }, [error]);
 

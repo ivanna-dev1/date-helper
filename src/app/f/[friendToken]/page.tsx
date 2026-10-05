@@ -6,9 +6,7 @@ import { LocalDateTime } from "@/components/LocalDateTime";
 import { RESPONSE_VIEW_SELECT, toSentAnswer } from "@/lib/responseView";
 import { getFriendCard } from "@/lib/friendCard";
 
-// The messenger preview: whose plan it is, when and where. The picture is
-// drawn on the server, which knows no time zone, so the link carries the
-// sender's zone ("?tz=Europe/Kyiv"). Without it the time is left out.
+// The server knows no time zone, so the link carries the sender's (?tz=); without it the time is left out.
 export async function generateMetadata(
   props: PageProps<"/f/[friendToken]">,
 ): Promise<Metadata> {
@@ -26,7 +24,7 @@ export async function generateMetadata(
       title,
       description,
       siteName: "Date Helper",
-      // The tag changes with the plan, so a messenger shows a fresh picture.
+      // A new tag makes messengers refresh the picture.
       images: card
         ? [
             {
@@ -40,20 +38,17 @@ export async function generateMetadata(
           ]
         : undefined,
     },
-    // The link shows where two people will be. Search engines must not show it.
+    // Keep out of search engines.
     robots: { index: false, follow: false },
   };
 }
 
 const labelStyle = "text-xs font-medium uppercase tracking-wide text-muted";
 
-// The page a friend opens. Read-only, no buttons, no playful words:
-// it may be just "this is where I am", or it may be about safety.
-// It always shows the current state, so a cancelled date shows as cancelled.
+// Read-only, neutral page. Always shows the current state.
 export default async function FriendPage(props: PageProps<"/f/[friendToken]">) {
   const { friendToken } = await props.params;
 
-  // Only what a friend needs. No tokens, no messages between the two.
   const invite = await prisma.invite.findUnique({
     where: { friendToken },
     select: {

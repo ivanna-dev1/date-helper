@@ -1,7 +1,5 @@
 import Link from "next/link";
 
-// Shown for any address that does not exist, for example /hello.
-// Invitation links have their own, more exact messages next to their pages.
 export default function NotFound() {
   return (
     <main className="flex flex-1 flex-col items-center justify-center gap-4 py-16 text-center">

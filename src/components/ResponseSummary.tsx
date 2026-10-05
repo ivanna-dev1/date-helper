@@ -7,33 +7,20 @@ import { TurnDecision } from "@/components/TurnDecision";
 import { LastMessage } from "@/components/LastMessage";
 import type { AnswerOutcome, LastWords, SentAnswer } from "@/lib/responseView";
 
-// The screen the invited person sees after answering.
-// It is shown right after sending (data from the form)
-// and later, when the link is opened again (data from the database).
 
 type ResponseSummaryProps = {
   answer: SentAnswer;
   authorName: string;
   whoPays: WhoPays | null;
-  friendToken: string; // for "Let a friend know where I am"
-  token: string; // the invitation's public token, from "/i/k7Fq2mXp9RtA"
-  guestName: string; // this person's own name, for "You" and "Max"
-  lastWords: LastWords | null; // the latest few words of the back-and-forth
-  // The author's turn link. The invited person sends it after a suggestion,
-  // so the author can answer from it. Empty before any suggestion.
+  friendToken: string;
+  token: string;
+  guestName: string;
+  lastWords: LastWords | null;
   turnToken: string | null;
-  // Changes with every move (made from the time of the last change).
-  // It goes into the shared address, so a messenger makes a fresh preview
-  // for every move and does not show the old one from its memory.
   shareVersion?: string;
-  // true when this browser is the author's: the author opened the link
-  // they sent. Then there are no answer buttons, only a hint.
   isAuthorBrowser?: boolean;
 };
 
-// Emoji and heading for each outcome. No hearts: a first date is often
-// closer to a friendly meeting. `byGuest` tells who made the latest
-// suggestion.
 const HEADINGS: Record<
   AnswerOutcome,
   { emoji: string; title: (authorName: string, byGuest: boolean) => string }
@@ -58,22 +45,16 @@ const HEADINGS: Record<
   },
 };
 
-// What the invited person sends to the author, and by which link.
-// After a suggestion the link is the author's turn link, so the author
-// can answer from it; otherwise the author gets the invitation link.
 function getShare(
   outcome: AnswerOutcome,
   byGuest: boolean,
 ): { text: string; toTurnLink: boolean } | null {
-  // A suggestion waits for the author: the link stays useful, so the button
-  // stays too, also when the page is opened again.
   if (outcome === "suggested") {
     return {
       text: "I suggested another option for our date 📨",
       toTurnLink: true,
     };
   }
-  // The invited person answered the author's suggestion.
   if (!byGuest && outcome === "suggestionAccepted") {
     return { text: "I said yes to your suggestion! 🎉", toTurnLink: true };
   }
@@ -83,9 +64,7 @@ function getShare(
       toTurnLink: true,
     };
   }
-  // The first answer. Also when the page is opened again: saving the answer
-  // sets the browser's role cookie, and then the server draws the page anew,
-  // so "just sent" is lost. And a reminder to tell the author does no harm.
+  // Also on reopen: saving sets the role cookie and the server redraws, so "just sent" is lost.
   if (outcome === "yes") {
     return { text: "I said yes to your invitation! 🎉", toTurnLink: false };
   }
@@ -113,11 +92,9 @@ export function ResponseSummary({
   const heading = HEADINGS[outcome];
   const path = `/i/${token}`;
   const share = getShare(outcome, byGuest);
-  // The date is agreed: show the shared plan instead of the answer details.
   const isAgreed = outcome === "yes" || outcome === "suggestionAccepted";
 
-  // The tag changes the address, so the messenger loads a fresh preview
-  // instead of the one it remembered for this link.
+  // The tag changes the URL so messengers refetch the preview.
   const tag = shareVersion ? `${outcome}-${shareVersion}` : outcome;
   const sharePath = `${
     share?.toTurnLink && turnToken ? `/d/${turnToken}` : path
@@ -127,8 +104,6 @@ export function ResponseSummary({
       path={sharePath}
       text={share.text}
       buttonLabel={`Let ${authorName} know`}
-      // The hint stays until this person picks a messenger: nobody tells
-      // the author for us, and the page may be opened again days later.
       hint={`${authorName} doesn't know yet`}
     />
   ) : null;
@@ -137,8 +112,6 @@ export function ResponseSummary({
     <section className="animate-card-in flex flex-col items-center gap-6 rounded-2xl border border-line bg-surface px-5 py-8 text-center">
       <h2 className="text-2xl font-bold text-ink">
         {heading.title(authorName, byGuest)}
-        {/* The emoji ends the heading line. A non-breaking space keeps it
-            next to the last word. aria-hidden: it is only decoration. */}
         {" "}
         <span aria-hidden="true">{heading.emoji}</span>
       </h2>
@@ -151,7 +124,6 @@ export function ResponseSummary({
         </p>
       )}
 
-      {/* The latest words go before the buttons, so they are read first. */}
       {isAgreed && (
         <LastMessage
           words={lastWords}
@@ -168,8 +140,6 @@ export function ResponseSummary({
           invitePath={path}
           friendPath={`/f/${friendToken}`}
           eventTitle={`Date with ${authorName}`}
-          // The author gets no message from us, so telling them is the
-          // first button under the plan.
           notifyButton={shareMenu}
         />
       )}
@@ -186,7 +156,6 @@ export function ResponseSummary({
           answer={answer}
           ownNote=""
           whoPaysText={whoPaysText}
-          // The choice cards below show the options.
           hideChoices
         />
       )}
@@ -200,7 +169,6 @@ export function ResponseSummary({
         />
       )}
 
-      {/* The author suggested something back: now this person decides. */}
       {outcome === "authorSuggested" && isAuthorBrowser && (
         <p className="text-sm text-muted">
           This is your suggestion — send this link to {guestName}.

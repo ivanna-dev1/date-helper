@@ -6,15 +6,12 @@ import { getShareOrigin } from "@/lib/siteUrl";
 import { useBrowserValue } from "@/hooks/useBrowserValue";
 
 type ShareMenuProps = {
-  path: string; // for example "/i/k7Fq2mXp9RtA"
-  text: string; // the message; the link is added after it
-  buttonLabel: string; // "Let Olia know"
-  hint?: string; // a line above the button until something is picked
-  // "main": the big pink button. "quiet": an outlined secondary button.
+  path: string;
+  text: string;
+  buttonLabel: string;
+  hint?: string;
   variant?: "main" | "quiet";
-  // Adds the sender's time zone to the link ("?tz=Europe/Kyiv"), so the
-  // preview picture can show the time. The server does not know any zone,
-  // and a friend is usually in the same city as the sender.
+  // Adds the sender's time zone (?tz=) so the preview image can show the time.
   withTimeZone?: boolean;
 };
 
@@ -23,17 +20,10 @@ const BUTTON_STYLES = {
   quiet: "rounded-xl border border-line py-3 text-sm font-medium text-muted",
 };
 
-// Small chips in rows of three: the list should not shout louder
-// than the card itself.
 const optionStyle =
   "flex items-center justify-center gap-1 rounded-lg border border-line bg-surface px-2 py-1.5 text-xs font-medium text-ink";
 
-/**
- * A main button that opens a list of messengers.
- *
- * We cannot know if the message was really sent: a messenger does not tell
- * us. So after any pick we only say "Sent? Great!".
- */
+// A button that opens a list of messengers. We cannot tell whether the message was sent.
 export function ShareMenu({
   path,
   text,
@@ -42,7 +32,6 @@ export function ShareMenu({
   variant = "main",
   withTimeZone = false,
 }: ShareMenuProps) {
-  // The site address and the phone share menu exist only in the browser.
   const fullLink = useBrowserValue<string | null>(() => {
     const link = `${getShareOrigin()}${path}`;
     if (!withTimeZone) return link;
@@ -56,7 +45,6 @@ export function ShareMenu({
   const [isOpen, setIsOpen] = useState(false);
   const [isPicked, setIsPicked] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
-  // A unique id that links the button to its list (for screen readers).
   const optionsId = useId();
 
   async function handleSystemShare() {
@@ -65,17 +53,15 @@ export function ShareMenu({
       await navigator.share({ text, url: fullLink });
       setIsPicked(true);
     } catch {
-      // The person closed the menu. Nothing to do.
+      // Menu closed; nothing to do.
     }
   }
 
   async function handleCopy() {
     if (!fullLink) return;
-    // Only the link, so it can be pasted into a browser or a message.
     await navigator.clipboard.writeText(fullLink);
     setIsCopied(true);
     setIsPicked(true);
-    // Put the button text back after a short moment.
     setTimeout(() => setIsCopied(false), 2000);
   }
 
@@ -107,10 +93,8 @@ export function ShareMenu({
           {SHARE_TARGETS.map((target) => (
             <a
               key={target.name}
-              // Until the address is known, the link goes nowhere.
               href={fullLink ? target.buildUrl(text, fullLink) : undefined}
-              // Web links open in a new tab. App links (viber:, sms:) must
-              // not, or an empty tab stays behind.
+              // App links (viber:, sms:) must not open a new tab.
               target={target.isWebLink ? "_blank" : undefined}
               rel="noopener noreferrer"
               onClick={() => setIsPicked(true)}
@@ -120,8 +104,6 @@ export function ShareMenu({
             </a>
           ))}
 
-          {/* The phone menu has every app, also Instagram and Signal.
-              Computers often do not have it, so we hide it there. */}
           {canUseSystemShare && (
             <button
               type="button"

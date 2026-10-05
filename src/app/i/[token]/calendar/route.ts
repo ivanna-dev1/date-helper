@@ -4,10 +4,6 @@ import { buildIcs, DATE_LENGTH_MINUTES } from "@/lib/calendar";
 import { DATE_FORMATS } from "@/lib/dateFormats";
 import { RESPONSE_VIEW_SELECT, toSentAnswer } from "@/lib/responseView";
 
-// GET /i/[token]/calendar — gives the agreed date as an .ics file.
-// It is a route, not a page: the answer is a file, not HTML.
-// Both people use it: the invited person has this link, and the author's
-// page knows the public token too.
 export async function GET(
   _request: Request,
   context: RouteContext<"/i/[token]/calendar">,
@@ -24,7 +20,6 @@ export async function GET(
     },
   });
 
-  // Only an agreed date goes to the calendar.
   if (
     !invite ||
     !invite.response ||
@@ -55,9 +50,7 @@ export async function GET(
 
   return new Response(ics, {
     headers: {
-      // Tells the browser this is a calendar file...
       "Content-Type": "text/calendar; charset=utf-8",
-      // ...and that it should be saved (or opened) as date.ics.
       "Content-Disposition": 'attachment; filename="date.ics"',
     },
   });

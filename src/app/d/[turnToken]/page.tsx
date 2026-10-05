@@ -13,10 +13,7 @@ import {
   toSentAnswer,
 } from "@/lib/responseView";
 
-// The author's turn link, sent by the invited person after a suggestion.
-// Whoever has it answers as the author: accept, decline, or suggest
-// something else. It does not give the rest of the author's rights
-// (cancelling stays on the author's own page).
+// The author's turn link: answer only, no cancelling.
 
 async function findByTurn(turnToken: string) {
   return prisma.invite.findUnique({
@@ -38,8 +35,6 @@ async function findByTurn(turnToken: string) {
   });
 }
 
-// The messenger preview: the same card and picture as the invitation link,
-// because both links are about the same date.
 export async function generateMetadata(
   props: PageProps<"/d/[turnToken]">,
 ): Promise<Metadata> {
@@ -69,7 +64,7 @@ export async function generateMetadata(
             ]
           : undefined,
     },
-    // The link works like a password. Search engines must not show it.
+    // The link works like a password: keep it out of search engines.
     robots: { index: false, follow: false },
   };
 }
@@ -78,7 +73,6 @@ export default async function TurnPage(props: PageProps<"/d/[turnToken]">) {
   const { turnToken } = await props.params;
   const invite = await findByTurn(turnToken);
 
-  // No such link: it never existed, or a newer suggestion replaced it.
   if (!invite || !invite.response) {
     notFound();
   }

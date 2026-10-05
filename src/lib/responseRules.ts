@@ -9,19 +9,15 @@ import {
   isZonedTime,
 } from "@/lib/inviteRules";
 
-// What the answer form sends us.
 export type SubmitResponseInput = {
-  token: string; // the public token from the link
+  token: string;
   type: ResponseType;
   respondentName: string;
   message: string;
-  timeId: number | null; // one of the author's time options, for "yes"
-  placeId: number | null; // one of the author's place options, for "yes"
-  // A suggestion: one or more own times (UTC with a zone) and places.
-  // The same lists as in the author's form, so both screens look alike.
+  timeId: number | null;
+  placeId: number | null;
   proposedTimes: string[];
   proposedPlaces: { name: string; note: string }[];
-  // Who pays, only with a suggestion. Leave it out to keep the author's.
   whoPays?: WhoPays | null;
 };
 
@@ -30,17 +26,12 @@ export type ResponseErrors = Partial<
   Record<"respondentName" | "message" | "time" | "place" | "form", string>
 >;
 
-// What the invitation offers right now: the author's options (to check
-// the picked ids and to see whether a suggestion changes anything)
-// and who pays.
 export type InviteOptions = {
   times: { id: number; startsAt: Date }[];
   places: { id: number; name: string; note: string | null }[];
   whoPays: WhoPays | null;
 };
 
-// A list of options as one string, in a fixed order, so two lists can be
-// compared: the order does not matter, only what is in them.
 export function timesKey(times: (Date | string)[]): string {
   return times
     .map((time) => new Date(time).getTime())
@@ -58,7 +49,6 @@ export function placesKey(
   return places.map(placeKey).sort().join(",");
 }
 
-// The rows of a suggestion without the empty ones, and without repeats.
 export function cleanTimes(times: string[]): string[] {
   return [...new Set(times.filter((time) => time !== ""))];
 }
@@ -76,13 +66,7 @@ export function cleanPlaces(
     );
 }
 
-/**
- * Checks an answer before we save it. Runs on the server.
- *
- * We also check that the picked ids belong to THIS invitation.
- * Without that, a direct request could send an id from someone else's
- * invitation, and our answer would point to a stranger's option.
- */
+// Runs on the server. Picked ids must belong to THIS invitation, or a direct request could point to a stranger's option.
 export function validateResponse(
   input: SubmitResponseInput,
   options: InviteOptions,
@@ -100,20 +84,17 @@ export function validateResponse(
     errors.message = `Keep it under ${RESPONSE_MESSAGE_MAX_LENGTH} characters`;
   }
 
-  // A wrong value can only come from a direct request, not from our form.
   if (!Object.values(ResponseType).includes(input.type)) {
     errors.form = "Unknown answer";
     return errors;
   }
 
-  // "No" needs nothing else: no time, no place.
   if (input.type === ResponseType.NO) {
     return errors;
   }
 
   const isCounter = input.type === ResponseType.COUNTER;
 
-  // A suggestion: the same lists as in the author's form.
   if (isCounter) {
     const times = cleanTimes(input.proposedTimes);
     const places = cleanPlaces(input.proposedPlaces);
@@ -142,8 +123,7 @@ export function validateResponse(
       errors.place = `Keep a note under ${PLACE_NOTE_MAX_LENGTH} characters`;
     }
 
-    // A suggestion must change something: for "the same again" there is
-    // the "yes" button.
+    // A suggestion must change something (use "Yes" for the same).
     const changesWhoPays =
       input.whoPays !== undefined && input.whoPays !== options.whoPays;
     const sameTimes =
@@ -158,7 +138,6 @@ export function validateResponse(
       errors.form = "Change the time, the place or who pays, or go back";
     }
   } else {
-    // "Yes": one of the author's options, and it must be from this invitation.
     if (input.timeId === null) {
       errors.time = "Pick a time";
     } else if (!options.times.some((time) => time.id === input.timeId)) {
@@ -171,7 +150,6 @@ export function validateResponse(
     }
   }
 
-  // A wrong value can only come from a direct request, not from our form.
   if (
     input.whoPays !== undefined &&
     input.whoPays !== null &&

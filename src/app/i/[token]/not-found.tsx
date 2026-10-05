@@ -1,6 +1,5 @@
 import Link from "next/link";
 
-// Shown when the link does not match any invitation.
 export default function InviteNotFound() {
   return (
     <main className="flex flex-1 flex-col items-center justify-center gap-4 py-16 text-center">

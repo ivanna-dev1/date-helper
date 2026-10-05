@@ -38,13 +38,9 @@ import {
   type PayChoice,
 } from "@/lib/whoPays";
 
-// Three ways to answer. The mode decides what the form shows.
-// "yes"     — pick a time and a place from the author's options
-// "counter" — the same, but you may suggest your own time or place
-// "no"      — the options are hidden, only your name and a few words
+// "yes" picks from the author's options; "counter" also allows own suggestions; "no" hides the options.
 type Mode = "yes" | "counter" | "no";
 
-// Which kind of answer each mode sends to the server.
 const TYPE_BY_MODE: Record<Mode, ResponseType> = {
   yes: ResponseType.YES,
   counter: ResponseType.COUNTER,
@@ -53,7 +49,7 @@ const TYPE_BY_MODE: Record<Mode, ResponseType> = {
 
 type InviteResponseFormProps = {
   token: string;
-  authorName: string; // for the text on the screen after sending
+  authorName: string;
   whoPays: WhoPays | null;
   friendToken: string;
   times: TimeOptionView[];
@@ -66,15 +62,12 @@ const fieldStyle =
   "rounded-xl border border-line bg-surface px-3.5 py-3 text-base text-ink outline-none placeholder:text-quiet focus:border-accent";
 const errorStyle = "mt-1 text-xs text-accent";
 
-// The text on the main button changes with the mode.
 const SUBMIT_LABELS: Record<Mode, string> = {
   yes: "Accept",
   counter: "Send my suggestion",
   no: "Send my answer",
 };
 
-// Ready-made lines, like in the author's form: it is easier to answer
-// than to stare at an empty field. They depend on the answer.
 const MESSAGE_TEMPLATES: Record<Mode, string[]> = {
   yes: ["Sounds great, see you!", "Perfect, I'll be there", "Can't wait!"],
   counter: [
@@ -104,27 +97,16 @@ export function InviteResponseForm({
   places,
 }: InviteResponseFormProps) {
   const [mode, setMode] = useState<Mode>("yes");
-  // The invited person has no name here yet, and only the author could
-  // have chosen, so the guest's name is never needed.
   const whoPaysText = getWhoPaysText(whoPays, authorName, "", "guest");
 
-  // When there is only one option, there is nothing to choose: it is
-  // picked from the start, so "Accept" is the only click needed.
   const onlyTime: Choice = times.length === 1 ? times[0].id : null;
   const onlyPlace: Choice = places.length === 1 ? places[0].id : null;
 
-  // The state lives here, not in InviteChoices: this form will send it.
   const [timeChoice, setTimeChoice] = useState<Choice>(onlyTime);
   const [placeChoice, setPlaceChoice] = useState<Choice>(onlyPlace);
-  // The suggestion: the same lists as in the author's form and in every
-  // later move. They start from the author's options, because people
-  // usually change one thing, not all of them.
   const ownTimes = useDraftList<TimeDraft>(createTimeDraft);
   const ownPlaces = useDraftList<PlaceDraft>(createPlaceDraft);
-  // The earliest time the picker allows: past days and hours are greyed out.
   const [minTime, setMinTime] = useState("");
-  // Who pays, from this person's side. Starts with the author's choice,
-  // so "Olia is treating" shows as the picked "Olia's treat" chip.
   const [payChoice, setPayChoice] = useState<PayChoice>(
     toPayChoice(whoPays, "guest"),
   );
@@ -136,19 +118,14 @@ export function InviteResponseForm({
 
   const [isSending, setIsSending] = useState(false);
   const [errors, setErrors] = useState<ResponseErrors>({});
-  // What was sent. While it is null, the form is shown.
   const [sentAnswer, setSentAnswer] = useState<SentAnswer | null>(null);
-  // After a suggestion: the author's link to answer it, sent by this person.
   const [turnToken, setTurnToken] = useState<string | null>(null);
-  // Who pays after this answer (a suggestion may have changed it).
   const [sentWhoPays, setSentWhoPays] = useState<WhoPays | null>(whoPays);
 
   function changeMode(nextMode: Mode) {
     setMode(nextMode);
-    // Old messages are about the old mode, so they would only confuse.
     setErrors({});
     if (nextMode === "counter") {
-      // Runs in a click handler, so the browser's time zone is known.
       ownTimes.replace(
         times.map((time) => ({
           id: crypto.randomUUID(),
@@ -175,11 +152,9 @@ export function InviteResponseForm({
     const isCounter = mode === "counter";
     const type = TYPE_BY_MODE[mode];
 
-    // For "no" nothing is picked, even if something was picked before.
     const timeId = !isNo && typeof timeChoice === "number" ? timeChoice : null;
     const placeId =
       !isNo && typeof placeChoice === "number" ? placeChoice : null;
-    // Own times go as UTC, turned in the browser (see src/lib/time.ts).
     const proposedTimes = isCounter
       ? ownTimes.items
           .filter((time) => time.value !== "")
@@ -191,7 +166,6 @@ export function InviteResponseForm({
           note: place.note,
         }))
       : [];
-    // Only a suggestion may change who pays; otherwise the author's stays.
     const newWhoPays =
       isCounter && isPayTouched ? toWhoPays(payChoice, "guest") : whoPays;
 
@@ -211,15 +185,11 @@ export function InviteResponseForm({
       if (result.ok) {
         setTurnToken(result.turnToken);
         setSentWhoPays(newWhoPays);
-        // The same values the server saved, in a form the screen can show.
-        // A suggestion with one time and one place looks like a plain plan;
-        // with more options the screen shows the choice, like the server.
         const saved = result.choices;
         const hasChoice =
           saved !== null && (saved.times.length > 1 || saved.places.length > 1);
         const onlySavedPlace = saved && !hasChoice ? saved.places[0] : null;
         setSentAnswer({
-          // Right after answering, the author has not decided anything yet.
           outcome: getOutcome(type, InviteStatus.PENDING),
           proposedBy: "guest",
           time: saved
@@ -264,8 +234,6 @@ export function InviteResponseForm({
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-      {/* The suggestion has the same lists as the author's form, so this
-          screen looks like every later move in the back-and-forth. */}
       {mode === "counter" && (
         <>
           <OptionLists times={ownTimes} places={ownPlaces} minTime={minTime} />
@@ -274,7 +242,6 @@ export function InviteResponseForm({
         </>
       )}
 
-      {/* When the answer is "no", there is nothing to pick. */}
       {mode === "yes" && (
         <InviteChoices
           times={times}
@@ -295,13 +262,10 @@ export function InviteResponseForm({
         />
       )}
 
-      {/* The author's choice about the bill, as on the plan later.
-          In the suggestion mode the chips show it instead. */}
       {mode === "yes" && whoPaysText && (
         <p className="-mt-2 text-sm italic text-muted">{whoPaysText}</p>
       )}
 
-      {/* A suggestion may also say who pays: "My treat" — "no, my treat". */}
       {mode === "counter" && (
         <PayChips
           value={payChoice}
@@ -325,7 +289,6 @@ export function InviteResponseForm({
           value={name}
           onChange={(event) => setName(event.target.value)}
           placeholder="Max"
-          // The same limit as the author's name.
           maxLength={AUTHOR_NAME_MAX_LENGTH}
           className={fieldStyle}
         />
@@ -379,8 +342,6 @@ export function InviteResponseForm({
           {isSending ? "Sending…" : SUBMIT_LABELS[mode]}
         </button>
 
-        {/* The buttons below the main one follow the mockup: the calm
-            "suggest" button, then the quietest "can't" button. */}
         {mode === "yes" ? (
           <>
             <button

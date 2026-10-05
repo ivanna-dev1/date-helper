@@ -7,8 +7,6 @@ type CancelInviteProps = {
   secretToken: string;
 };
 
-// A quiet "Cancel invitation" link. Cancelling cannot be undone,
-// so the first click only asks "Are you sure?".
 export function CancelInvite({ secretToken }: CancelInviteProps) {
   const [isAsking, setIsAsking] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -19,7 +17,6 @@ export function CancelInvite({ secretToken }: CancelInviteProps) {
     setError(null);
     try {
       const result = await cancelInvite(secretToken);
-      // On success the page shows the cancelled state by itself.
       if (!result.ok) {
         setError(result.error);
       }
@@ -33,8 +30,6 @@ export function CancelInvite({ secretToken }: CancelInviteProps) {
       <button
         type="button"
         onClick={() => setIsAsking(true)}
-        // A real button with a border, like the other calm buttons:
-        // cancelling must be easy to find, but still not the loudest thing.
         className="w-full rounded-xl border border-line py-3 text-sm font-medium text-muted"
       >
         Cancel invitation

@@ -1,14 +1,11 @@
 import { ImageResponse } from "next/og";
 import { getInviteCard, getInviteForCard } from "@/lib/inviteCard";
 
-// The picture a messenger shows under the link ("screen 0").
-// Next.js adds the <meta property="og:image"> tag for this page by itself.
 export const alt = "An invitation from Date Helper";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-// Colors from the mockup. This file draws a picture, not HTML,
-// so Tailwind classes do not work here: only inline styles.
+// Only inline styles work in an image.
 const COLORS = {
   pink: "#E8B4C8",
   peach: "#D4847C",
@@ -62,9 +59,7 @@ export default async function Image({
             textAlign: "center",
           }}
         >
-          {/* The emoji ends the heading line, like on the site.
-              A normal space, not a non-breaking one: with a non-breaking
-              space the emoji is drawn as an empty box. */}
+          {/* A normal space: with a non-breaking one the emoji is drawn as a box. */}
           <div
             style={{
               fontSize: 60,

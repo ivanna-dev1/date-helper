@@ -8,16 +8,15 @@ import {
 } from "@/lib/inviteRules";
 import type { useDraftList } from "@/hooks/useDraftList";
 
-// One row of each list, as the forms keep them.
 export type TimeDraft = {
   id: string;
-  value: string; // "2026-09-12T18:00", the format of <input type="datetime-local">
+  value: string;
 };
 
 export type PlaceDraft = {
   id: string;
   name: string;
-  note: string; // a hint, for example "by the entrance"
+  note: string;
 };
 
 export function createTimeDraft(): TimeDraft {
@@ -31,7 +30,6 @@ export function createPlaceDraft(): PlaceDraft {
 type OptionListsProps = {
   times: ReturnType<typeof useDraftList<TimeDraft>>;
   places: ReturnType<typeof useDraftList<PlaceDraft>>;
-  // The earliest time the picker allows: past days and hours are greyed out.
   minTime: string;
 };
 
@@ -43,11 +41,6 @@ const addButtonStyle =
   "rounded-xl border-2 border-dashed border-accent px-3 py-2.5 text-sm font-medium text-accent";
 const removeButtonStyle = "px-2 text-xl text-accent";
 
-/**
- * "When?" and "Where?" as lists you can add to and remove from — the same
- * on every screen where someone suggests something: the author's first
- * invitation, the invited person's first answer, and every move after that.
- */
 export function OptionLists({ times, places, minTime }: OptionListsProps) {
   return (
     <>
@@ -140,8 +133,7 @@ export function OptionLists({ times, places, minTime }: OptionListsProps) {
   );
 }
 
-// "2026-12-20T16:00:00.000Z" → "2026-12-20T18:00" in the reader's own zone.
-// Runs only in the browser, which is the only place that knows the zone.
+// UTC ISO string to local "YYYY-MM-DDTHH:mm"; browser only.
 export function toLocalInputValue(iso: string): string {
   const date = new Date(iso);
   const pad = (n: number) => String(n).padStart(2, "0");

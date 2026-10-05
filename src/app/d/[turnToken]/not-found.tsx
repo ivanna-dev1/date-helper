@@ -1,5 +1,4 @@
-// Shown when a turn link does not work. Usually it is an old one:
-// a newer suggestion came with a new link.
+// Usually an old link: a newer suggestion came with a new one.
 export default function TurnNotFound() {
   return (
     <main className="flex flex-1 flex-col items-center justify-center gap-4 py-16 text-center">

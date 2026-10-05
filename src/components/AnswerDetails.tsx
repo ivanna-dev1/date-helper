@@ -3,12 +3,8 @@ import type { SentAnswer } from "@/lib/responseView";
 
 type AnswerDetailsProps = {
   answer: SentAnswer;
-  // The note next to a suggested value: "(your idea)" for the invited
-  // person, "(Max's idea)" for the author.
   ownNote: string;
-  // "Olia is treating" and the like, or null when nobody chose.
   whoPaysText?: string | null;
-  // true when the choice cards show the options on the same screen.
   hideChoices?: boolean;
 };
 
@@ -18,8 +14,6 @@ const valueStyle = "text-base font-semibold text-ink";
 const noteStyle = "block text-sm font-normal text-muted";
 const orStyle = "text-xs text-quiet";
 
-// "When" and "Where" of an answer. Both pages show it.
-// A suggestion with a choice shows all its options: "Friday or Saturday".
 export function AnswerDetails({
   answer,
   ownNote,

@@ -8,8 +8,6 @@ type RememberInviteProps = {
   secretToken: string;
 };
 
-// Draws nothing. It only writes the author's own link into this browser,
-// so the author can come back to their page later (see src/lib/myInvites.ts).
 export function RememberInvite({
   publicToken,
   secretToken,

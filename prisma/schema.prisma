@@ -1,5 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
   provider = "prisma-client"
@@ -10,7 +8,6 @@ datasource db {
   provider = "postgresql"
 }
 
-// What kind of date it is. It changes how the invitation card looks.
 enum DateFormat {
   COFFEE
   WALK
@@ -19,31 +16,26 @@ enum DateFormat {
   SURPRISE
 }
 
-// Optional. The author can leave it empty.
 enum WhoPays {
-  MY_TREAT // the author pays (the name is from the author's form)
+  MY_TREAT
   SPLIT
   DECIDE_LATER
-  GUEST_TREAT // the invited person pays (chosen in the back-and-forth)
+  GUEST_TREAT
 }
 
-// Where the invitation is in its life.
 enum InviteStatus {
-  PENDING // sent, still waiting for an answer
-  CONFIRMED // they picked a time and a place
-  DECLINED // they said no
-  COUNTER // they suggested something else
-  CANCELLED // the author cancelled it
+  PENDING
+  CONFIRMED
+  DECLINED
+  COUNTER
+  CANCELLED
 }
 
-// Who made the latest suggestion in the back-and-forth.
-// The other person is the one who answers it.
 enum Party {
   AUTHOR
   GUEST
 }
 
-// What the invited person answered.
 enum ResponseType {
   YES
   NO
@@ -53,30 +45,23 @@ enum ResponseType {
 model Invite {
   id Int @id @default(autoincrement())
 
-  // Three different links to the same invite. Each one shows a different page,
-  // so knowing one link must not give access to the others.
-  publicToken String @unique // the invited person opens this one
-  secretToken String @unique // the author manages the invite here
-  friendToken String @unique // read-only page for "let a friend know"
+  // Three links to one invite, each opening a different page.
+  publicToken String @unique
+  secretToken String @unique
+  friendToken String @unique
 
-  // The back-and-forth about the time and place. Only the latest suggestion
-  // matters, so it overwrites the one before (no history is kept).
-  // turnToken is a link for the author: when the guest suggests something,
-  // the guest sends it, and whoever has it can answer as the author.
-  // A new suggestion makes a new token, so an old link stops working.
-  // Both are empty for invitations made before this feature.
+  // Only the latest suggestion is kept. turnToken is the author's link; a new guest suggestion replaces it. Null on old invites.
   turnToken      String? @unique
   lastProposedBy Party?
 
-  // The latest few words of the back-and-forth and who wrote them.
-  // Only the latest one is kept, like the latest suggestion.
+  // Latest words only, and who wrote them.
   turnMessage   String?
   lastMessageBy Party?
 
   authorName String
   message    String
   format     DateFormat
-  whoPays    WhoPays? // null means the author did not choose
+  whoPays    WhoPays?
 
   status    InviteStatus @default(PENDING)
   expiresAt DateTime
@@ -85,18 +70,13 @@ model Invite {
 
   timeOptions  TimeOption[]
   placeOptions PlaceOption[]
-  response     Response? // one invite gets at most one answer
+  response     Response?
 
-  // The options of the latest move in the back-and-forth ("Friday or
-  // Saturday?"). The other person picks one of them when accepting.
-  // A new move replaces them; accepting moves the picked ones into
-  // the response and removes the rows.
+  // Options of the latest move; replaced by each new move, moved into the response on accept.
   turnTimes  TurnTime[]
   turnPlaces TurnPlace[]
 }
 
-// One time of the latest move. Like TimeOption, but it lives only
-// until the next move.
 model TurnTime {
   id Int @id @default(autoincrement())
 
@@ -108,7 +88,6 @@ model TurnTime {
   @@index([inviteId])
 }
 
-// One place of the latest move, with its hint.
 model TurnPlace {
   id Int @id @default(autoincrement())
 
@@ -129,7 +108,6 @@ model TimeOption {
 
   startsAt DateTime
 
-  // Set when the invited person picks this option.
   chosenBy Response?
 
   @@index([inviteId])
@@ -142,7 +120,7 @@ model PlaceOption {
   invite   Invite @relation(fields: [inviteId], references: [id], onDelete: Cascade)
 
   name String
-  note String? // for example "by the entrance"
+  note String?
 
   chosenBy Response?
 
@@ -152,7 +130,6 @@ model PlaceOption {
 model Response {
   id Int @id @default(autoincrement())
 
-  // @unique makes this one-to-one: an invite can have only one response.
   inviteId Int    @unique
   invite   Invite @relation(fields: [inviteId], references: [id], onDelete: Cascade)
 
@@ -160,16 +137,13 @@ model Response {
   respondentName String
   message        String?
 
-  // Filled when type is YES.
   chosenTimeId  Int?         @unique
   chosenTime    TimeOption?  @relation(fields: [chosenTimeId], references: [id])
   chosenPlaceId Int?         @unique
   chosenPlace   PlaceOption? @relation(fields: [chosenPlaceId], references: [id])
 
-  // Filled when type is COUNTER. The person can change the time, the place, or both.
   proposedTime      DateTime?
   proposedPlace     String?
-  // The hint to an own place, like "by the entrance" for the author's places.
   proposedPlaceNote String?
 
   createdAt DateTime @default(now())

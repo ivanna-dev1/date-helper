@@ -15,8 +15,6 @@ import {
   toSentAnswer,
 } from "@/lib/responseView";
 
-// The title and description a messenger shows next to the picture.
-// They follow the state of the date, like the picture does.
 export async function generateMetadata(
   props: PageProps<"/i/[token]">,
 ): Promise<Metadata> {
@@ -33,8 +31,7 @@ export async function generateMetadata(
       title,
       description,
       siteName: "Date Helper",
-      // The tag in the address changes with the state of the date.
-      // Without it a messenger keeps showing the first picture it saw.
+      // A new tag makes messengers refresh the picture.
       images: card
         ? [
             {
@@ -46,7 +43,7 @@ export async function generateMetadata(
           ]
         : undefined,
     },
-    // The link works like a password. Search engines must not show it.
+    // The link works like a password: keep it out of search engines.
     robots: { index: false, follow: false },
   };
 }
@@ -54,20 +51,13 @@ export async function generateMetadata(
 export default async function InvitePage(props: PageProps<"/i/[token]">) {
   const { token } = await props.params;
 
-  // One call. The nested `select` loads the time and place rows together
-  // with the invite. Prisma makes one query per table, not one per option,
-  // so the number of queries does not grow with the number of options.
-  // We use `select`, not `include`: `include` would also load secretToken,
-  // and this page must never have it. friendToken is fine here: it only
-  // opens a read-only page with the same details this person already sees.
+  // `select`, not `include`: include would load secretToken, which this page must never have.
   const invite = await prisma.invite.findUnique({
     where: { publicToken: token },
     select: {
       authorName: true,
       whoPays: true,
       friendToken: true,
-      // The author's turn link: the invited person sends it after a
-      // suggestion. Both fields are empty on old invitations.
       turnToken: true,
       lastProposedBy: true,
       turnMessage: true,
@@ -85,8 +75,6 @@ export default async function InvitePage(props: PageProps<"/i/[token]">) {
         select: { id: true, name: true, note: true },
         orderBy: { id: "asc" },
       },
-      // The answer, if there is one, with the picked time and place.
-      // Still the same one call: Prisma joins these rows for us.
       response: { select: RESPONSE_VIEW_SELECT },
       ...TURN_OPTIONS_SELECT,
     },
@@ -98,18 +86,14 @@ export default async function InvitePage(props: PageProps<"/i/[token]">) {
 
   const formatInfo = DATE_FORMATS[invite.format];
 
-  // Shown only in the author's own browser: it remembers their link.
   const authorLink = <AuthorPageLink publicToken={token} />;
 
-  // These parts never change, so they stay on the server.
   const header = (
     <>
       <h1 className="text-center text-2xl font-bold text-ink">
         {invite.authorName} {formatInfo.invitePhrase}
-        {/* A non-breaking space keeps the emoji next to the last word,
-            so it never moves to a new line alone. */}
+        {/* nbsp keeps the emoji with the last word */}
         {" "}
-        {/* aria-hidden: the emoji is decoration, the heading says the same. */}
         <span aria-hidden="true">{formatInfo.emoji}</span>
       </h1>
 
@@ -119,8 +103,7 @@ export default async function InvitePage(props: PageProps<"/i/[token]">) {
     </>
   );
 
-  // Cancelled by the author: this goes first, because it ends the story
-  // whatever was answered before.
+  // Cancelled comes first: it ends the story whatever was answered.
   if (invite.status === InviteStatus.CANCELLED) {
     return (
       <main className="flex flex-1 flex-col gap-6 py-10">
@@ -138,10 +121,7 @@ export default async function InvitePage(props: PageProps<"/i/[token]">) {
     );
   }
 
-  // One invitation gets one answer. If it is already there, the form would
-  // only lead to an error, so we show the answer instead.
-  // This check goes before the expiry check: the date is only a deadline
-  // for answering. An answer given in time stays visible after it.
+  // Checked before expiry: an answer given in time stays visible after the deadline.
   const { response } = invite;
   if (response) {
     return (
@@ -174,10 +154,7 @@ export default async function InvitePage(props: PageProps<"/i/[token]">) {
     );
   }
 
-  // The link is real, so "not found" would be a lie and would look like a
-  // broken link. We say the truth: the time for this invitation is over.
-  // Comparing two moments is safe on the server: a moment is the same in
-  // every time zone. Only showing it as text depends on the zone.
+  // The link is real, so say the time is over instead of "not found".
   if (invite.expiresAt < new Date()) {
     return (
       <main className="flex flex-1 flex-col items-center justify-center gap-4 py-16 text-center">
@@ -197,8 +174,7 @@ export default async function InvitePage(props: PageProps<"/i/[token]">) {
     <main className="flex flex-1 flex-col gap-6 py-10">
       {header}
 
-      {/* The answer form reacts to clicks, so it is a client component.
-          We turn Date objects into strings before passing them down. */}
+      {/* Client component: Dates are passed as strings. */}
       <InviteResponseForm
         token={token}
         authorName={invite.authorName}

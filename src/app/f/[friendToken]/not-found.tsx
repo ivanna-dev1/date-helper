@@ -1,4 +1,3 @@
-// Shown when the friend link does not match any date.
 export default function FriendNotFound() {
   return (
     <main className="flex flex-1 flex-col items-center justify-center gap-4 py-16 text-center">

@@ -1,19 +1,14 @@
 import { cookies } from "next/headers";
 import type { Proposer } from "@/lib/responseView";
 
-// Which side of one date this browser is on: the author or the invited
-// person. It stops a simple mistake: opening the link you just sent to
-// the other person and answering your own suggestion.
-// It is a guard against a mistake, not a lock: another browser has no
-// cookie, and then the link alone decides, as before.
+// Which side of this date the browser is on. Guards against answering your own suggestion; not a lock (another browser has no cookie).
 
-// One cookie per invitation, so one browser can make several invitations
-// and answer other people's ones.
+// One cookie per invitation.
 function cookieName(publicToken: string): string {
   return `dh_role_${publicToken}`;
 }
 
-// Half a year: longer than any back-and-forth about one date.
+// Half a year: longer than any back-and-forth.
 const ROLE_MAX_AGE_SECONDS = 60 * 60 * 24 * 180;
 
 export async function getBrowserRole(
@@ -23,13 +18,12 @@ export async function getBrowserRole(
   return value === "author" || value === "guest" ? value : null;
 }
 
-// Can be called only in a Server Action: a page cannot set cookies.
+// Server Actions only: pages cannot set cookies.
 export async function rememberBrowserRole(
   publicToken: string,
   role: Proposer,
 ): Promise<void> {
   (await cookies()).set(cookieName(publicToken), role, {
-    // Only the server reads it: page scripts do not need it.
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",

@@ -25,11 +25,11 @@ import {
 } from "@/lib/whoPays";
 
 type TurnDecisionProps = {
-  turnKey: TurnKey; // the link this person came by: it decides the rights
-  viewer: Viewer; // who is answering, for the "My treat" words
-  answer: SentAnswer; // the suggestion on the table
+  turnKey: TurnKey;
+  viewer: Viewer;
+  answer: SentAnswer;
   currentWhoPays: WhoPays | null;
-  otherName: string; // the other person, for the "Olia's treat" chip
+  otherName: string;
 };
 
 const labelStyle = "text-xs font-medium uppercase tracking-wide text-muted";
@@ -38,8 +38,6 @@ const fieldStyle =
 const quietButton =
   "w-full rounded-xl border border-line py-3 text-sm font-medium text-muted disabled:opacity-60";
 
-// Ready-made lines for the few words, like in the author's form.
-// They fit any move, because one field is used for all three.
 const MESSAGE_TEMPLATES = [
   "Sounds good!",
   "How about this instead?",
@@ -49,18 +47,6 @@ const MESSAGE_TEMPLATES = [
 // Nothing to do: the choice cards below never show "your own" fields.
 function ignore() {}
 
-/**
- * The answer to the latest suggestion: accept, decline, or suggest
- * something else. The same component works for both people — which
- * person is acting comes from the link (turnKey), not from the screen.
- *
- * A suggestion may give a choice: several times and places, like the
- * author's first invitation. Then accepting means picking one of each.
- * A few words can go with any move.
- *
- * After any move the server refreshes the page, so the new state shows
- * by itself and this component does not keep the result.
- */
 export function TurnDecision({
   turnKey,
   viewer,
@@ -73,8 +59,6 @@ export function TurnDecision({
   const [error, setError] = useState<string | null>(null);
   const [isSuggesting, setIsSuggesting] = useState(false);
 
-  // What is picked from a suggestion with a choice. One option is picked
-  // from the start: there is nothing to choose.
   const [timeChoice, setTimeChoice] = useState<Choice>(
     choices?.times.length === 1 ? choices.times[0].id : null,
   );
@@ -85,11 +69,9 @@ export function TurnDecision({
   const times = useDraftList<TimeDraft>(createTimeDraft);
   const places = useDraftList<PlaceDraft>(createPlaceDraft);
   const [payChoice, setPayChoice] = useState<PayChoice>(null);
-  // Who pays is sent only after a click on a chip. Otherwise it stays as it
-  // is, so "Olia is treating" is not lost when Max only changes the place.
+  // Sent only after a click on a chip, so an existing "My treat" is not lost.
   const [isPayTouched, setIsPayTouched] = useState(false);
   const [message, setMessage] = useState("");
-  // The earliest time the picker allows: past days and hours are greyed out.
   const [minTime, setMinTime] = useState("");
 
   async function send(decision: "accept" | "decline" | "counter") {
@@ -100,7 +82,6 @@ export function TurnDecision({
       const result = await answerTurn({
         key: turnKey,
         decision,
-        // The browser knows the zone, so the times turn into UTC here.
         proposedTimes: isCounter
           ? times.items
               .filter((time) => time.value !== "")
@@ -127,8 +108,6 @@ export function TurnDecision({
   }
 
   function openSuggestion() {
-    // Start from the suggestion on the table: people usually change one
-    // thing, not all of them.
     const currentTimes = choices
       ? choices.times.map((time) => time.startsAt)
       : answer.time
@@ -159,7 +138,6 @@ export function TurnDecision({
     setIsSuggesting(true);
   }
 
-  // A few words go with any move, so the field is in both views.
   const messageField = (
     <label className="flex flex-col gap-1.5 text-left">
       <span className={labelStyle}>A few words — optional</span>
@@ -235,8 +213,6 @@ export function TurnDecision({
 
   return (
     <div className="flex w-full flex-col gap-2">
-      {/* A suggestion with a choice: pick one time and one place,
-          the same cards as on the first invitation. */}
       {choices && (
         <div className="mb-4 text-left">
           <InviteChoices

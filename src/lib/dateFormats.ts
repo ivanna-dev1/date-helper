@@ -1,14 +1,12 @@
 import { DateFormat } from "@/generated/prisma/enums";
 
-// Everything that depends on the date format, in one place.
-// The form and the invitation page both read it.
 type FormatInfo = {
-  label: string; // short name for the chips in the form
-  emoji: string; // shown on the invitation card, not in the form
-  invitePhrase: string; // goes after the author's name
+  label: string;
+  emoji: string;
+  invitePhrase: string;
 };
 
-// Record<DateFormat, ...> makes TypeScript check that every format is here.
+// Record<DateFormat, ...> makes TypeScript require every format.
 export const DATE_FORMATS: Record<DateFormat, FormatInfo> = {
   [DateFormat.COFFEE]: {
     label: "Coffee",
@@ -37,7 +35,6 @@ export const DATE_FORMATS: Record<DateFormat, FormatInfo> = {
   },
 };
 
-// The same data as a list, in a fixed order, for rendering the chips.
 export const FORMAT_ORDER: DateFormat[] = [
   DateFormat.COFFEE,
   DateFormat.WALK,

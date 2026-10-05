@@ -1,13 +1,9 @@
 import { ImageResponse } from "next/og";
 import { getFriendCard } from "@/lib/friendCard";
 
-// The picture a messenger shows under the friend's link.
-// Calm on purpose: a plain card, no gradient, no emoji.
-// A route, not an opengraph-image file: it needs the time zone from the
-// address ("?tz=Europe/Kyiv"), and an opengraph-image file cannot read it.
+// A route, not opengraph-image: it needs the ?tz= time zone from the address.
 const size = { width: 1200, height: 630 };
 
-// Colors from the mockup. A picture, not HTML: only inline styles.
 const COLORS = {
   background: "#F8F5F2",
   line: "#E8B4C8",

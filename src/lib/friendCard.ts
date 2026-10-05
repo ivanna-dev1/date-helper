@@ -2,24 +2,21 @@ import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { InviteStatus } from "@/generated/prisma/enums";
 
-// The text of the preview for the friend's link. Calm, like the page:
-// no emoji, no playful words.
+// Preview text for the friend's link: calm, no emoji.
 export type FriendCard = {
-  tag: string; // goes into the picture address, changes with the plan
+  tag: string;
   title: string;
   subtitle: string;
 };
 
-// Needed twice for one link (the <meta> tags and the picture):
-// cache() asks the database once per request.
-// The time is shown only when the link carries the sender's time zone
-// ("?tz=Europe/Kyiv"): the server itself does not know any zone.
+// cache(): one database query per request for the <meta> tags and the picture.
+// Time is shown only when the link carries ?tz=; the server knows no zone.
 export const getFriendCard = cache(
   async (
     friendToken: string,
     timeZone: string | null,
   ): Promise<FriendCard | null> => {
-    // Only what the preview shows. No tokens, no messages.
+    // Only what the preview shows: no tokens, no messages.
     const invite = await prisma.invite.findUnique({
       where: { friendToken },
       select: {
@@ -68,8 +65,7 @@ export const getFriendCard = cache(
   },
 );
 
-// "Sat, Oct 10, 6:00 PM" in the given zone, or null when the zone is
-// missing or not a real one (a link can be changed by hand).
+// Formatted time in the zone, or null for a missing or invalid zone.
 function formatInZone(time: Date, timeZone: string | null): string | null {
   if (!timeZone) return null;
   try {

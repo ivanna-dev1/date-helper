@@ -1,14 +1,10 @@
 import { DateFormat, WhoPays } from "@/generated/prisma/enums";
 
-// One place for all the rules. The form and the server both read them,
-// so they can never disagree.
 export const AUTHOR_NAME_MAX_LENGTH = 50;
 export const MESSAGE_MAX_LENGTH = 120;
 export const PLACE_NAME_MAX_LENGTH = 60;
 export const PLACE_NOTE_MAX_LENGTH = 60;
 
-// The answer message is not shown on the small preview card,
-// so it can be longer than the invitation message.
 export const RESPONSE_MESSAGE_MAX_LENGTH = 300;
 
 export const MAX_TIME_OPTIONS = 5;
@@ -17,9 +13,7 @@ export const MAX_PLACE_OPTIONS = 5;
 export const EXPIRY_OPTIONS = [7, 14, 30];
 export const DEFAULT_EXPIRY_DAYS = 30;
 
-// A time must end with its zone: "...Z" or "...+02:00".
-// Without a zone the server would read it in its own zone and could be
-// hours off. Our forms always send a zone; a direct request might not.
+// A time needs a zone ("Z" or "+02:00"); without it the server would guess in its own zone.
 export function isZonedTime(value: string): boolean {
   return (
     /(Z|[+-]\d{2}:\d{2})$/.test(value) &&
@@ -33,19 +27,13 @@ export type CreateInviteInput = {
   format: DateFormat;
   whoPays: WhoPays | null;
   expiryDays: number;
-  times: string[]; // UTC with a zone, for example "2026-09-12T15:00:00.000Z"
+  times: string[];
   places: { name: string; note: string }[];
 };
 
-// Field name -> message shown under that field.
 export type InviteErrors = Partial<Record<keyof CreateInviteInput, string>>;
 
-/**
- * Checks the data before we save it.
- *
- * This runs on the server. A Server Action can be called by a direct POST
- * request, without our form, so we cannot trust anything that comes in.
- */
+// Runs on the server: a direct POST can skip our form, so nothing is trusted.
 export function validateInvite(input: CreateInviteInput): InviteErrors {
   const errors: InviteErrors = {};
 
@@ -63,7 +51,6 @@ export function validateInvite(input: CreateInviteInput): InviteErrors {
     errors.message = `Keep it under ${MESSAGE_MAX_LENGTH} characters`;
   }
 
-  // A wrong value can only come from a direct request, not from our form.
   if (!Object.values(DateFormat).includes(input.format)) {
     errors.format = "Pick what you are inviting to";
   }

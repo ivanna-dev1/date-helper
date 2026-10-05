@@ -6,18 +6,12 @@ import {
   PLACE_NOTE_MAX_LENGTH,
 } from "@/lib/inviteRules";
 
-// Data that comes from the server page. Only plain values:
-// a Date object is sent as an ISO string, because props from the server
-// must be simple data the browser can rebuild.
 export type TimeOptionView = { id: number; startsAt: string };
 export type PlaceOptionView = { id: number; name: string; note: string | null };
 
-// What is picked in one group: an option id, "other" for the person's own
-// suggestion, or null when nothing is picked yet.
 export type Choice = number | "other" | null;
 
-// This component has no state of its own. The parent form keeps the state
-// and passes it down, because the form needs these values to send the answer.
+// No state here: the parent form needs the values to send the answer.
 type InviteChoicesProps = {
   times: TimeOptionView[];
   places: PlaceOptionView[];
@@ -25,15 +19,13 @@ type InviteChoicesProps = {
   placeChoice: Choice;
   onTimeChoice: (choice: Choice) => void;
   onPlaceChoice: (choice: Choice) => void;
-  // true when the person wants to suggest something else
   allowOther: boolean;
-  otherTime: string; // "2026-09-12T18:00", the format of <input type="datetime-local">
+  otherTime: string;
   otherPlace: string;
-  otherPlaceNote: string; // a hint to the own place, "by the entrance"
+  otherPlaceNote: string;
   onOtherPlaceNote: (value: string) => void;
   onOtherTime: (value: string) => void;
   onOtherPlace: (value: string) => void;
-  // Messages from the server, shown under each group.
   timeError?: string;
   placeError?: string;
 };
@@ -41,18 +33,12 @@ type InviteChoicesProps = {
 const legendStyle =
   "mb-2 text-xs font-medium uppercase tracking-wide text-muted";
 
-// Each option is a real radio input, hidden from the eye, plus a label that
-// looks like a card. The hidden input still gives keyboard arrows and tells
-// screen readers "option 2 of 3, selected".
-// `peer` marks the input; `peer-checked:` styles the card next to it
-// when that input is checked.
+// A visually hidden radio keeps keyboard and screen-reader support; `peer-checked:` styles the card.
 const cardStyle =
   "block cursor-pointer rounded-xl border-2 border-line bg-surface px-3.5 py-3 text-base text-ink " +
   "peer-checked:border-brand peer-checked:bg-brand peer-checked:text-white " +
   "peer-focus-visible:ring-2 peer-focus-visible:ring-accent";
 
-// The card for "my own suggestion" has a dashed border, so it looks
-// different from the real options.
 const otherCardStyle = `${cardStyle} border-dashed text-accent`;
 
 const fieldStyle =
@@ -141,8 +127,6 @@ export function InviteChoices({
               />
               <label htmlFor={`place-${place.id}`} className={cardStyle}>
                 <span className="block">{place.name}</span>
-                {/* opacity keeps the note a bit lighter than the name,
-                    both on the light card and on the pink selected card */}
                 {place.note && (
                   <span className="mt-0.5 block text-xs opacity-75">
                     {place.note}
@@ -176,7 +160,6 @@ export function InviteChoices({
                     aria-label="Your place"
                     className={fieldStyle}
                   />
-                  {/* The same hint field as in the author's form. */}
                   <input
                     type="text"
                     value={otherPlaceNote}

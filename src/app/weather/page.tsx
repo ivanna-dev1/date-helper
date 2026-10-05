@@ -5,9 +5,7 @@ export const metadata: Metadata = {
   title: "Weather — Date Helper",
 };
 
-// Only our own pages are allowed as "back": a path that starts with "/".
-// "//other-site.com" also starts with "/", but it leads to another site,
-// so we stop it too.
+// Only local paths are allowed as "back"; "//host" would leave the site.
 function getSafeBackPath(back: string | string[] | undefined): string {
   if (typeof back === "string" && back.startsWith("/") && !back.startsWith("//")) {
     return back;
@@ -15,8 +13,7 @@ function getSafeBackPath(back: string | string[] | undefined): string {
   return "/";
 }
 
-// The weather is not ready yet. The button already exists, so the product
-// looks complete; this page says honestly that the feature is coming.
+// Placeholder: real weather needs a location.
 export default async function WeatherPage(props: PageProps<"/weather">) {
   const { back } = await props.searchParams;
   const backPath = getSafeBackPath(back);

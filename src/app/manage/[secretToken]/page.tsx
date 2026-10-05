@@ -18,7 +18,7 @@ import {
 
 export const metadata: Metadata = {
   title: "Your invitation — Date Helper",
-  // This page is private. Search engines must never show it.
+  // Private page: keep it out of search engines.
   robots: { index: false, follow: false },
 };
 
@@ -27,7 +27,6 @@ export default async function ManagePage(
 ) {
   const { secretToken } = await props.params;
 
-  // We only need a few fields here, so we ask the database for just those.
   const invite = await prisma.invite.findUnique({
     where: { secretToken },
     select: {
@@ -42,8 +41,6 @@ export default async function ManagePage(
       lastProposedBy: true,
       turnMessage: true,
       lastMessageBy: true,
-      // The answer, if there is one. The same fields as on the invited
-      // person's page, so both show the answer the same way.
       response: { select: RESPONSE_VIEW_SELECT },
       ...TURN_OPTIONS_SELECT,
     },
@@ -55,8 +52,7 @@ export default async function ManagePage(
 
   const formatInfo = DATE_FORMATS[invite.format];
 
-  // Writes the secret link into this browser, so the author can come back
-  // here even from the invited person's link.
+  // Remember the secret link in this browser.
   const remember = (
     <RememberInvite
       publicToken={invite.publicToken}
@@ -67,8 +63,6 @@ export default async function ManagePage(
   const { response } = invite;
   const publicPath = `/i/${invite.publicToken}`;
 
-  // Cancelled: nothing else matters any more. The invited person may
-  // already know about the date, so the author can tell them.
   if (invite.status === InviteStatus.CANCELLED) {
     const name = response?.respondentName;
     return (
@@ -83,8 +77,7 @@ export default async function ManagePage(
             The link now says that the date is cancelled.
           </p>
         </div>
-        {/* key: a new menu, closed. Without it React could keep the open
-            menu from the page before cancelling. */}
+        {/* key: remounts the menu closed. */}
         <ShareMenu
           key="cancelled"
           path={publicPath}
@@ -98,18 +91,13 @@ export default async function ManagePage(
     );
   }
 
-  // Before a "no" and before the deadline without an answer, the date is
-  // still possible, so the author can cancel it.
   const cancel = <CancelInvite secretToken={secretToken} />;
 
-  // There is an answer: show it. This goes before the expiry check,
-  // because an answer given in time stays valid after the deadline.
+  // An answer given in time stays valid after the deadline.
   if (response) {
     return (
       <main className="flex flex-1 flex-col gap-6 py-10">
         {remember}
-        {/* The card below says what the answer is. The heading only
-            reminds which invitation this page is about. */}
         <h1 className="text-center text-2xl font-bold text-ink">
           Your {formatInfo.label.toLowerCase()} invitation{" "}
           <span aria-hidden="true">{formatInfo.emoji}</span>
@@ -134,8 +122,6 @@ export default async function ManagePage(
           publicPath={publicPath}
           shareVersion={invite.updatedAt.getTime().toString(36)}
         />
-        {/* After "no" (the first answer or the author's) there is
-            nothing to cancel. */}
         {(invite.status === InviteStatus.CONFIRMED ||
           invite.status === InviteStatus.COUNTER) &&
           cancel}
@@ -143,8 +129,6 @@ export default async function ManagePage(
     );
   }
 
-  // No answer, and the time to answer is over. The link no longer takes
-  // answers, so there is nothing to send.
   if (invite.expiresAt < new Date()) {
     return (
       <main className="flex flex-1 flex-col items-center justify-center gap-4 py-16 text-center">
@@ -185,7 +169,6 @@ export default async function ManagePage(
         buttonLabel="Send the invitation"
       />
 
-      {/* The waiting state. */}
       <section className="flex flex-col items-center gap-1 rounded-2xl border border-line bg-surface px-5 py-6 text-center">
         <span aria-hidden="true" className="text-3xl">
           ⏳
@@ -194,7 +177,6 @@ export default async function ManagePage(
           Waiting for an answer
         </h2>
         <p className="text-sm text-muted">
-          {/* The date is shown in the reader's time zone. */}
           The link works until{" "}
           <LocalDateTime value={invite.expiresAt.toISOString()} />
         </p>

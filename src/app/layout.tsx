@@ -19,8 +19,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${nunito.variable} h-full antialiased`}>
       <body className="min-h-full font-sans">
-        {/* People open this on a phone, so the content is always
-            narrow and centered — even on a big screen. */}
         <div className="mx-auto flex min-h-dvh w-full max-w-[420px] flex-col px-5">
           {children}
         </div>
