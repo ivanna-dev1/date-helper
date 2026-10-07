@@ -7,6 +7,7 @@ import {
   PLACE_NOTE_MAX_LENGTH,
 } from "@/lib/inviteRules";
 import type { useDraftList } from "@/hooks/useDraftList";
+import { PhotoField } from "@/components/PhotoField";
 
 export type TimeDraft = {
   id: string;
@@ -17,6 +18,7 @@ export type PlaceDraft = {
   id: string;
   name: string;
   note: string;
+  photoUrl: string | null;
 };
 
 export function createTimeDraft(): TimeDraft {
@@ -24,7 +26,7 @@ export function createTimeDraft(): TimeDraft {
 }
 
 export function createPlaceDraft(): PlaceDraft {
-  return { id: crypto.randomUUID(), name: "", note: "" };
+  return { id: crypto.randomUUID(), name: "", note: "", photoUrl: null };
 }
 
 type OptionListsProps = {
@@ -110,6 +112,11 @@ export function OptionLists({ times, places, minTime }: OptionListsProps) {
                 aria-label={`Note for place ${index + 1}`}
                 className={`${fieldStyle} py-2 text-sm`}
               />
+              <PhotoField
+                photoUrl={place.photoUrl}
+                label={`place ${index + 1}`}
+                onChange={(photoUrl) => places.update(place.id, { photoUrl })}
+              />
             </div>
             {places.items.length > 1 && (
               <button
@@ -133,7 +140,7 @@ export function OptionLists({ times, places, minTime }: OptionListsProps) {
   );
 }
 
-// UTC ISO string to local "YYYY-MM-DDTHH:mm"; browser only.
+// UTC ISO string to the reader's local datetime-local value (browser only).
 export function toLocalInputValue(iso: string): string {
   const date = new Date(iso);
   const pad = (n: number) => String(n).padStart(2, "0");

@@ -2,11 +2,13 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { InviteStatus } from "@/generated/prisma/enums";
+import Image from "next/image";
 import { LocalDateTime } from "@/components/LocalDateTime";
+import { MapsLink } from "@/components/MapsLink";
 import { RESPONSE_VIEW_SELECT, toSentAnswer } from "@/lib/responseView";
 import { getFriendCard } from "@/lib/friendCard";
 
-// The server knows no time zone, so the link carries the sender's (?tz=); without it the time is left out.
+// The server knows no time zone, so the link carries the sender's (?tz=).
 export async function generateMetadata(
   props: PageProps<"/f/[friendToken]">,
 ): Promise<Metadata> {
@@ -24,7 +26,6 @@ export async function generateMetadata(
       title,
       description,
       siteName: "Date Helper",
-      // A new tag makes messengers refresh the picture.
       images: card
         ? [
             {
@@ -38,17 +39,17 @@ export async function generateMetadata(
           ]
         : undefined,
     },
-    // Keep out of search engines.
+    // The link shows where two people will be: keep it out of search engines.
     robots: { index: false, follow: false },
   };
 }
 
 const labelStyle = "text-xs font-medium uppercase tracking-wide text-muted";
 
-// Read-only, neutral page. Always shows the current state.
 export default async function FriendPage(props: PageProps<"/f/[friendToken]">) {
   const { friendToken } = await props.params;
 
+  // Only what a friend needs: no tokens, no messages.
   const invite = await prisma.invite.findUnique({
     where: { friendToken },
     select: {
@@ -119,12 +120,22 @@ function PlanDetails({
         <div className="flex flex-col gap-1">
           <dt className={labelStyle}>Where</dt>
           <dd className="text-base font-semibold text-ink">
+            {answer.placePhoto && (
+              <Image
+                src={answer.placePhoto}
+                alt={`Photo of ${answer.place}`}
+                width={400}
+                height={220}
+                className="mb-2 h-32 w-full rounded-xl object-cover"
+              />
+            )}
             {answer.place}
             {answer.placeNote && (
               <span className="block text-sm font-normal text-muted">
                 {answer.placeNote}
               </span>
             )}
+            <MapsLink place={answer.place} className="mt-1" />
           </dd>
         </div>
       )}

@@ -17,17 +17,17 @@ enum DateFormat {
 }
 
 enum WhoPays {
-  MY_TREAT
+  MY_TREAT // the author pays
   SPLIT
   DECIDE_LATER
-  GUEST_TREAT
+  GUEST_TREAT // the invited person pays
 }
 
 enum InviteStatus {
   PENDING
   CONFIRMED
   DECLINED
-  COUNTER
+  COUNTER // they suggested something else
   CANCELLED
 }
 
@@ -45,16 +45,19 @@ enum ResponseType {
 model Invite {
   id Int @id @default(autoincrement())
 
-  // Three links to one invite, each opening a different page.
+  // Three links to one invite; knowing one must not give access to the others.
   publicToken String @unique
   secretToken String @unique
   friendToken String @unique
 
-  // Only the latest suggestion is kept. turnToken is the author's link; a new guest suggestion replaces it. Null on old invites.
+  // Only the latest suggestion matters and it overwrites the previous one (no history).
+  // turnToken is the author's link for answering a guest's suggestion; each new
+  // guest suggestion issues a new token, so an old link stops working.
+  // Both are empty for older invitations.
   turnToken      String? @unique
   lastProposedBy Party?
 
-  // Latest words only, and who wrote them.
+  // Only the latest message and its writer are kept.
   turnMessage   String?
   lastMessageBy Party?
 
@@ -72,11 +75,12 @@ model Invite {
   placeOptions PlaceOption[]
   response     Response?
 
-  // Options of the latest move; replaced by each new move, moved into the response on accept.
+  // Options of the latest move; replaced by the next move, or moved into the response on accept.
   turnTimes  TurnTime[]
   turnPlaces TurnPlace[]
 }
 
+// One time of the latest move; lives until the next move.
 model TurnTime {
   id Int @id @default(autoincrement())
 
@@ -96,6 +100,7 @@ model TurnPlace {
 
   name String
   note String?
+  photoUrl String?
 
   @@index([inviteId])
 }
@@ -121,6 +126,8 @@ model PlaceOption {
 
   name String
   note String?
+  // Photo of the place; shown only inside the app, never in a messenger preview.
+  photoUrl String?
 
   chosenBy Response?
 
@@ -145,6 +152,7 @@ model Response {
   proposedTime      DateTime?
   proposedPlace     String?
   proposedPlaceNote String?
+  proposedPhotoUrl String?
 
   createdAt DateTime @default(now())
 }

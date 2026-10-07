@@ -8,6 +8,7 @@ import {
   RESPONSE_MESSAGE_MAX_LENGTH,
   isZonedTime,
 } from "@/lib/inviteRules";
+import { toSafePhotoUrl } from "@/lib/photo";
 
 export type SubmitResponseInput = {
   token: string;
@@ -17,18 +18,22 @@ export type SubmitResponseInput = {
   timeId: number | null;
   placeId: number | null;
   proposedTimes: string[];
-  proposedPlaces: { name: string; note: string }[];
+  proposedPlaces: { name: string; note: string; photoUrl?: string | null }[];
   whoPays?: WhoPays | null;
 };
 
-// "form" is for problems that are not about one field.
 export type ResponseErrors = Partial<
   Record<"respondentName" | "message" | "time" | "place" | "form", string>
 >;
 
 export type InviteOptions = {
   times: { id: number; startsAt: Date }[];
-  places: { id: number; name: string; note: string | null }[];
+  places: {
+    id: number;
+    name: string;
+    note: string | null;
+    photoUrl: string | null;
+  }[];
   whoPays: WhoPays | null;
 };
 
@@ -39,12 +44,17 @@ export function timesKey(times: (Date | string)[]): string {
     .join(",");
 }
 
-export function placeKey(place: { name: string; note: string | null }): string {
-  return `${place.name.toLowerCase()}|${place.note ?? ""}`;
+// The photo is part of the place: changing only it is a new suggestion.
+export function placeKey(place: {
+  name: string;
+  note: string | null;
+  photoUrl?: string | null;
+}): string {
+  return `${place.name.toLowerCase()}|${place.note ?? ""}|${place.photoUrl ?? ""}`;
 }
 
 export function placesKey(
-  places: { name: string; note: string | null }[],
+  places: { name: string; note: string | null; photoUrl?: string | null }[],
 ): string {
   return places.map(placeKey).sort().join(",");
 }
@@ -54,10 +64,14 @@ export function cleanTimes(times: string[]): string[] {
 }
 
 export function cleanPlaces(
-  places: { name: string; note: string }[],
-): { name: string; note: string }[] {
+  places: { name: string; note: string; photoUrl?: string | null }[],
+): { name: string; note: string; photoUrl: string | null }[] {
   return places
-    .map((place) => ({ name: place.name.trim(), note: place.note.trim() }))
+    .map((place) => ({
+      name: place.name.trim(),
+      note: place.note.trim(),
+      photoUrl: toSafePhotoUrl(place.photoUrl),
+    }))
     .filter((place) => place.name !== "")
     .filter(
       (place, index, list) =>
@@ -66,7 +80,7 @@ export function cleanPlaces(
     );
 }
 
-// Runs on the server. Picked ids must belong to THIS invitation, or a direct request could point to a stranger's option.
+// Server-side check. Picked ids must belong to THIS invitation, or a direct request could point to a stranger's option.
 export function validateResponse(
   input: SubmitResponseInput,
   options: InviteOptions,
@@ -123,7 +137,7 @@ export function validateResponse(
       errors.place = `Keep a note under ${PLACE_NOTE_MAX_LENGTH} characters`;
     }
 
-    // A suggestion must change something (use "Yes" for the same).
+    // A suggestion must change something; "yes" is for the same again.
     const changesWhoPays =
       input.whoPays !== undefined && input.whoPays !== options.whoPays;
     const sameTimes =

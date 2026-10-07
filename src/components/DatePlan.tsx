@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { CalendarMenu } from "@/components/CalendarMenu";
 import { LocalDateTime } from "@/components/LocalDateTime";
+import Image from "next/image";
+import { MapsLink } from "@/components/MapsLink";
 import { ShareMenu } from "@/components/ShareMenu";
 import { buildGoogleCalendarUrl, DATE_LENGTH_MINUTES } from "@/lib/calendar";
 import type { SentAnswer } from "@/lib/responseView";
@@ -38,10 +40,20 @@ export function DatePlan({
 
       {answer.place && (
         <div className="w-full rounded-xl bg-bg px-4 py-3">
+          {answer.placePhoto && (
+            <Image
+              src={answer.placePhoto}
+              alt={`Photo of ${answer.place}`}
+              width={400}
+              height={220}
+              className="mb-2 h-32 w-full rounded-lg object-cover"
+            />
+          )}
           <p className="text-sm font-semibold text-ink">{answer.place}</p>
           {answer.placeNote && (
             <p className="mt-1 text-xs text-muted">{answer.placeNote}</p>
           )}
+          <MapsLink place={answer.place} className="mt-1.5" />
         </div>
       )}
 

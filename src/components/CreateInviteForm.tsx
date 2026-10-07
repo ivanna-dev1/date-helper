@@ -3,23 +3,26 @@
 import { useRef, useState } from "react";
 import { DateFormat, WhoPays } from "@/generated/prisma/enums";
 import { useDraftList } from "@/hooks/useDraftList";
+import {
+  createPlaceDraft,
+  createTimeDraft,
+  OptionLists,
+  toLocalInputValue,
+  type PlaceDraft,
+  type TimeDraft,
+} from "@/components/OptionLists";
 import { useBrowserValue } from "@/hooks/useBrowserValue";
 import { createInvite } from "@/app/actions";
 import {
   AUTHOR_NAME_MAX_LENGTH,
   DEFAULT_EXPIRY_DAYS,
   EXPIRY_OPTIONS,
-  MAX_PLACE_OPTIONS,
-  MAX_TIME_OPTIONS,
   MESSAGE_MAX_LENGTH,
-  PLACE_NAME_MAX_LENGTH,
-  PLACE_NOTE_MAX_LENGTH,
   type InviteErrors,
 } from "@/lib/inviteRules";
 import { DATE_FORMATS, FORMAT_ORDER } from "@/lib/dateFormats";
 import { toUtcString } from "@/lib/time";
 
-// Ready-made lines; they depend on the format.
 const MESSAGE_TEMPLATES: Record<DateFormat, string[]> = {
   [DateFormat.COFFEE]: [
     "Coffee this weekend?",
@@ -54,32 +57,10 @@ const WHO_PAYS_OPTIONS = [
   { value: WhoPays.DECIDE_LATER, label: "Decide later" },
 ];
 
-type TimeDraft = {
-  id: string;
-  value: string;
-};
-
-type PlaceDraft = {
-  id: string;
-  name: string;
-  note: string;
-};
-
-function createTimeDraft(): TimeDraft {
-  return { id: crypto.randomUUID(), value: "" };
-}
-
-function createPlaceDraft(): PlaceDraft {
-  return { id: crypto.randomUUID(), name: "", note: "" };
-}
-
 const labelStyle =
   "mb-1.5 text-xs font-medium uppercase tracking-wide text-muted";
 const fieldStyle =
   "rounded-xl border border-line bg-surface px-3.5 py-3 text-base text-ink outline-none placeholder:text-quiet focus:border-accent";
-const addButtonStyle =
-  "mt-2 rounded-xl border-2 border-dashed border-accent px-3 py-2.5 text-sm font-medium text-accent";
-const removeButtonStyle = "px-2 text-xl text-accent";
 const errorStyle = "mt-1 text-xs text-accent";
 
 export function CreateInviteForm() {
@@ -89,12 +70,17 @@ export function CreateInviteForm() {
   const [whoPays, setWhoPays] = useState<WhoPays | null>(null);
   const [expiryDays, setExpiryDays] = useState(DEFAULT_EXPIRY_DAYS);
 
-  // Server and browser disagree on "today": render the date after mount to avoid a hydration mismatch.
+  // Shown only after mount: server and browser "today" can differ (hydration).
   const expiryDate = useBrowserValue<string | null>(() => {
     const date = new Date();
     date.setDate(date.getDate() + expiryDays);
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   }, null);
+
+  const minTime = useBrowserValue(
+    () => toLocalInputValue(new Date().toISOString()),
+    "",
+  );
 
   const times = useDraftList<TimeDraft>(createTimeDraft);
   const places = useDraftList<PlaceDraft>(createPlaceDraft);
@@ -103,10 +89,10 @@ export function CreateInviteForm() {
 
   const [isSaving, setIsSaving] = useState(false);
   const [errors, setErrors] = useState<InviteErrors>({});
-  // A ref blocks a double click at once; state updates only on the next render.
+  // A ref blocks double clicks that state would miss before the re-render.
   const isSavingRef = useRef(false);
 
-  // preventDefault: otherwise the fields would end up in the URL.
+  // Keep form data out of the URL.
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (isSavingRef.current) return;
@@ -122,14 +108,16 @@ export function CreateInviteForm() {
         format,
         whoPays,
         expiryDays,
-        // Only the browser knows the author's time zone.
+        // UTC is made in the browser: only it knows the author's zone.
         times: times.items.map((time) => toUtcString(time.value)),
         places: places.items.map((place) => ({
+          photoUrl: place.photoUrl,
           name: place.name,
           note: place.note,
         })),
       });
 
+      // On success the server redirects, so a result means an error.
       if (result) {
         hasErrors = true;
         setErrors(result.errors);
@@ -223,102 +211,9 @@ export function CreateInviteForm() {
         {errors.message && <p className={errorStyle}>{errors.message}</p>}
       </div>
 
-      <fieldset className="flex flex-col border-0 p-0">
-        <legend className={labelStyle}>When?</legend>
-        <p className="mb-2 text-xs text-quiet">
-          Add one time or a few — they pick one.
-        </p>
-
-        <div className="flex flex-col gap-2">
-          {times.items.map((time, index) => (
-            <div key={time.id} className="flex items-center gap-2">
-              <input
-                type="datetime-local"
-                value={time.value}
-                onChange={(event) =>
-                  times.update(time.id, { value: event.target.value })
-                }
-                aria-label={`Time option ${index + 1}`}
-                className={`${fieldStyle} flex-1`}
-              />
-              {times.items.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => times.remove(time.id)}
-                  aria-label={`Remove time option ${index + 1}`}
-                  className={removeButtonStyle}
-                >
-                  ×
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {errors.times && <p className={errorStyle}>{errors.times}</p>}
-
-        {times.items.length < MAX_TIME_OPTIONS && (
-          <button type="button" onClick={times.add} className={addButtonStyle}>
-            + Add another option
-          </button>
-        )}
-      </fieldset>
-
-      <fieldset className="flex flex-col border-0 p-0">
-        <legend className={labelStyle}>Where?</legend>
-        <p className="mb-2 text-xs text-quiet">
-          One place or a few. The note says where exactly to meet.
-        </p>
-
-        <div className="flex flex-col gap-3">
-          {places.items.map((place, index) => (
-            <div key={place.id} className="flex items-start gap-2">
-              <div className="flex flex-1 flex-col gap-1.5">
-                <input
-                  type="text"
-                  value={place.name}
-                  onChange={(event) =>
-                    places.update(place.id, { name: event.target.value })
-                  }
-                  placeholder="Bluebird Coffee"
-                  maxLength={PLACE_NAME_MAX_LENGTH}
-                  aria-label={`Place ${index + 1}`}
-                  className={fieldStyle}
-                />
-                <input
-                  type="text"
-                  value={place.note}
-                  onChange={(event) =>
-                    places.update(place.id, { note: event.target.value })
-                  }
-                  placeholder="by the entrance — optional"
-                  maxLength={PLACE_NOTE_MAX_LENGTH}
-                  aria-label={`Note for place ${index + 1}`}
-                  className={`${fieldStyle} py-2 text-sm`}
-                />
-              </div>
-              {places.items.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => places.remove(place.id)}
-                  aria-label={`Remove place ${index + 1}`}
-                  className={removeButtonStyle}
-                >
-                  ×
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {errors.places && <p className={errorStyle}>{errors.places}</p>}
-
-        {places.items.length < MAX_PLACE_OPTIONS && (
-          <button type="button" onClick={places.add} className={addButtonStyle}>
-            + Add another option
-          </button>
-        )}
-      </fieldset>
+      <OptionLists times={times} places={places} minTime={minTime} />
+      {errors.times && <p className={errorStyle}>{errors.times}</p>}
+      {errors.places && <p className={errorStyle}>{errors.places}</p>}
 
       <fieldset className="flex flex-col border-0 p-0">
         <legend className={labelStyle}>

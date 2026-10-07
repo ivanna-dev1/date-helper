@@ -1,17 +1,23 @@
 "use client";
 
+import Image from "next/image";
 import { LocalDateTime } from "@/components/LocalDateTime";
+import { MapsLink } from "@/components/MapsLink";
 import {
   PLACE_NAME_MAX_LENGTH,
   PLACE_NOTE_MAX_LENGTH,
 } from "@/lib/inviteRules";
 
 export type TimeOptionView = { id: number; startsAt: string };
-export type PlaceOptionView = { id: number; name: string; note: string | null };
+export type PlaceOptionView = {
+  id: number;
+  name: string;
+  note: string | null;
+  photoUrl: string | null;
+};
 
 export type Choice = number | "other" | null;
 
-// No state here: the parent form needs the values to send the answer.
 type InviteChoicesProps = {
   times: TimeOptionView[];
   places: PlaceOptionView[];
@@ -33,7 +39,6 @@ type InviteChoicesProps = {
 const legendStyle =
   "mb-2 text-xs font-medium uppercase tracking-wide text-muted";
 
-// A visually hidden radio keeps keyboard and screen-reader support; `peer-checked:` styles the card.
 const cardStyle =
   "block cursor-pointer rounded-xl border-2 border-line bg-surface px-3.5 py-3 text-base text-ink " +
   "peer-checked:border-brand peer-checked:bg-brand peer-checked:text-white " +
@@ -126,6 +131,15 @@ export function InviteChoices({
                 className="peer sr-only"
               />
               <label htmlFor={`place-${place.id}`} className={cardStyle}>
+                {place.photoUrl && (
+                  <Image
+                    src={place.photoUrl}
+                    alt={`Photo of ${place.name}`}
+                    width={400}
+                    height={220}
+                    className="mb-2 h-28 w-full rounded-lg object-cover"
+                  />
+                )}
                 <span className="block">{place.name}</span>
                 {place.note && (
                   <span className="mt-0.5 block text-xs opacity-75">
@@ -133,6 +147,7 @@ export function InviteChoices({
                   </span>
                 )}
               </label>
+              <MapsLink place={place.name} className="mt-1 ml-1" />
             </div>
           ))}
 

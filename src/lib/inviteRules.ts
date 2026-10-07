@@ -1,10 +1,12 @@
 import { DateFormat, WhoPays } from "@/generated/prisma/enums";
 
+// Shared by the form and the server.
 export const AUTHOR_NAME_MAX_LENGTH = 50;
 export const MESSAGE_MAX_LENGTH = 120;
 export const PLACE_NAME_MAX_LENGTH = 60;
 export const PLACE_NOTE_MAX_LENGTH = 60;
 
+// Longer than the invitation message: not shown on the preview card.
 export const RESPONSE_MESSAGE_MAX_LENGTH = 300;
 
 export const MAX_TIME_OPTIONS = 5;
@@ -13,7 +15,7 @@ export const MAX_PLACE_OPTIONS = 5;
 export const EXPIRY_OPTIONS = [7, 14, 30];
 export const DEFAULT_EXPIRY_DAYS = 30;
 
-// A time needs a zone ("Z" or "+02:00"); without it the server would guess in its own zone.
+// Without a zone the server would read the time in its own zone and be off.
 export function isZonedTime(value: string): boolean {
   return (
     /(Z|[+-]\d{2}:\d{2})$/.test(value) &&
@@ -28,12 +30,12 @@ export type CreateInviteInput = {
   whoPays: WhoPays | null;
   expiryDays: number;
   times: string[];
-  places: { name: string; note: string }[];
+  places: { name: string; note: string; photoUrl?: string | null }[];
 };
 
 export type InviteErrors = Partial<Record<keyof CreateInviteInput, string>>;
 
-// Runs on the server: a direct POST can skip our form, so nothing is trusted.
+// Runs on the server: a Server Action can be called by a direct POST.
 export function validateInvite(input: CreateInviteInput): InviteErrors {
   const errors: InviteErrors = {};
 
@@ -55,7 +57,10 @@ export function validateInvite(input: CreateInviteInput): InviteErrors {
     errors.format = "Pick what you are inviting to";
   }
 
-  if (input.whoPays !== null && !Object.values(WhoPays).includes(input.whoPays)) {
+  if (
+    input.whoPays !== null &&
+    !Object.values(WhoPays).includes(input.whoPays)
+  ) {
     errors.whoPays = "Unknown option";
   }
 

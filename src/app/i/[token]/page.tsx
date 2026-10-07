@@ -31,7 +31,7 @@ export async function generateMetadata(
       title,
       description,
       siteName: "Date Helper",
-      // A new tag makes messengers refresh the picture.
+      // The tag changes with the state, so messengers do not keep an old picture.
       images: card
         ? [
             {
@@ -51,7 +51,7 @@ export async function generateMetadata(
 export default async function InvitePage(props: PageProps<"/i/[token]">) {
   const { token } = await props.params;
 
-  // `select`, not `include`: include would load secretToken, which this page must never have.
+  // `select`, not `include`: this page must never load secretToken.
   const invite = await prisma.invite.findUnique({
     where: { publicToken: token },
     select: {
@@ -72,7 +72,7 @@ export default async function InvitePage(props: PageProps<"/i/[token]">) {
         orderBy: { startsAt: "asc" },
       },
       placeOptions: {
-        select: { id: true, name: true, note: true },
+        select: { id: true, name: true, note: true, photoUrl: true },
         orderBy: { id: "asc" },
       },
       response: { select: RESPONSE_VIEW_SELECT },
@@ -92,7 +92,6 @@ export default async function InvitePage(props: PageProps<"/i/[token]">) {
     <>
       <h1 className="text-center text-2xl font-bold text-ink">
         {invite.authorName} {formatInfo.invitePhrase}
-        {/* nbsp keeps the emoji with the last word */}
         {" "}
         <span aria-hidden="true">{formatInfo.emoji}</span>
       </h1>
@@ -121,7 +120,7 @@ export default async function InvitePage(props: PageProps<"/i/[token]">) {
     );
   }
 
-  // Checked before expiry: an answer given in time stays visible after the deadline.
+  // An existing answer is checked before expiry: the deadline is only for answering.
   const { response } = invite;
   if (response) {
     return (
@@ -174,7 +173,6 @@ export default async function InvitePage(props: PageProps<"/i/[token]">) {
     <main className="flex flex-1 flex-col gap-6 py-10">
       {header}
 
-      {/* Client component: Dates are passed as strings. */}
       <InviteResponseForm
         token={token}
         authorName={invite.authorName}

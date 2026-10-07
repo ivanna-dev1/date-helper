@@ -38,7 +38,6 @@ import {
   type PayChoice,
 } from "@/lib/whoPays";
 
-// "yes" picks from the author's options; "counter" also allows own suggestions; "no" hides the options.
 type Mode = "yes" | "counter" | "no";
 
 const TYPE_BY_MODE: Record<Mode, ResponseType> = {
@@ -137,6 +136,7 @@ export function InviteResponseForm({
           id: crypto.randomUUID(),
           name: place.name,
           note: place.note ?? "",
+          photoUrl: place.photoUrl,
         })),
       );
       setMinTime(toLocalInputValue(new Date().toISOString()));
@@ -164,6 +164,7 @@ export function InviteResponseForm({
       ? ownPlaces.items.map((place) => ({
           name: place.name,
           note: place.note,
+          photoUrl: place.photoUrl,
         }))
       : [];
     const newWhoPays =
@@ -203,6 +204,9 @@ export function InviteResponseForm({
           placeNote: saved
             ? (onlySavedPlace?.note ?? null)
             : (places.find((place) => place.id === placeId)?.note ?? null),
+          placePhoto: saved
+            ? (onlySavedPlace?.photoUrl ?? null)
+            : (places.find((place) => place.id === placeId)?.photoUrl ?? null),
           isOwnTime: false,
           isOwnPlace: false,
           choices: hasChoice ? saved : null,

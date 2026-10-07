@@ -1,4 +1,6 @@
+import Image from "next/image";
 import { LocalDateTime } from "@/components/LocalDateTime";
+import { MapsLink } from "@/components/MapsLink";
 import type { SentAnswer } from "@/lib/responseView";
 
 type AnswerDetailsProps = {
@@ -50,6 +52,15 @@ export function AnswerDetails({
         <div className="flex flex-col gap-1">
           <dt className={labelStyle}>Where</dt>
           <dd className={valueStyle}>
+            {answer.placePhoto && (
+              <Image
+                src={answer.placePhoto}
+                alt={`Photo of ${answer.place}`}
+                width={400}
+                height={220}
+                className="mb-2 h-28 w-full rounded-xl object-cover"
+              />
+            )}
             {answer.place}
             {answer.isOwnPlace && (
               <span className={ownNoteStyle}>{ownNote}</span>
@@ -57,6 +68,7 @@ export function AnswerDetails({
             {answer.placeNote && (
               <span className={noteStyle}>{answer.placeNote}</span>
             )}
+            <MapsLink place={answer.place} className="mt-1" />
           </dd>
         </div>
       )}
@@ -66,8 +78,18 @@ export function AnswerDetails({
           {choices.places.map((place, index) => (
             <dd key={place.id} className={valueStyle}>
               {index > 0 && <span className={`${orStyle} block`}>or</span>}
+              {place.photoUrl && (
+                <Image
+                  src={place.photoUrl}
+                  alt={`Photo of ${place.name}`}
+                  width={400}
+                  height={220}
+                  className="mb-2 h-28 w-full rounded-xl object-cover"
+                />
+              )}
               {place.name}
               {place.note && <span className={noteStyle}>{place.note}</span>}
+              <MapsLink place={place.name} className="mt-1" />
             </dd>
           ))}
         </div>

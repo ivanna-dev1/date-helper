@@ -69,7 +69,7 @@ export function TurnDecision({
   const times = useDraftList<TimeDraft>(createTimeDraft);
   const places = useDraftList<PlaceDraft>(createPlaceDraft);
   const [payChoice, setPayChoice] = useState<PayChoice>(null);
-  // Sent only after a click on a chip, so an existing "My treat" is not lost.
+  // Sent only after a click on a chip, so the other person's "My treat" is kept.
   const [isPayTouched, setIsPayTouched] = useState(false);
   const [message, setMessage] = useState("");
   const [minTime, setMinTime] = useState("");
@@ -91,6 +91,7 @@ export function TurnDecision({
           ? places.items.map((place) => ({
               name: place.name,
               note: place.note,
+              photoUrl: place.photoUrl,
             }))
           : undefined,
         whoPays:
@@ -116,7 +117,13 @@ export function TurnDecision({
     const currentPlaces = choices
       ? choices.places
       : answer.place
-        ? [{ name: answer.place, note: answer.placeNote }]
+        ? [
+            {
+              name: answer.place,
+              note: answer.placeNote,
+              photoUrl: answer.placePhoto,
+            },
+          ]
         : [];
     times.replace(
       currentTimes.map((time) => ({
@@ -129,6 +136,7 @@ export function TurnDecision({
         id: crypto.randomUUID(),
         name: place.name,
         note: place.note ?? "",
+        photoUrl: place.photoUrl ?? null,
       })),
     );
     setPayChoice(toPayChoice(currentWhoPays, viewer));

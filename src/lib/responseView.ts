@@ -1,6 +1,8 @@
 import type { Prisma } from "@/generated/prisma/client";
 import { InviteStatus, Party, ResponseType } from "@/generated/prisma/enums";
 
+// Where the story is now. suggested / authorSuggested: the other side decides;
+// suggestionAccepted / suggestionDeclined: the last suggestion was answered.
 export type AnswerOutcome =
   | "yes"
   | "no"
@@ -13,18 +15,23 @@ export type AnswerOutcome =
 export type Proposer = "author" | "guest";
 
 export type TurnTimeView = { id: number; startsAt: string };
-export type TurnPlaceView = { id: number; name: string; note: string | null };
+export type TurnPlaceView = {
+  id: number;
+  name: string;
+  note: string | null;
+  photoUrl: string | null;
+};
 
-// An answer in a simple form, ready to show on the screen.
-// Only plain values, so it can go from the server to a client component.
 export type SentAnswer = {
   outcome: AnswerOutcome;
   proposedBy: Proposer;
   time: string | null;
   place: string | null;
   placeNote: string | null;
+  placePhoto: string | null;
   isOwnTime: boolean;
   isOwnPlace: boolean;
+  // Set when the latest move offers a choice; then time and place stay empty.
   choices: { times: TurnTimeView[]; places: TurnPlaceView[] } | null;
 };
 
@@ -36,7 +43,8 @@ export const RESPONSE_VIEW_SELECT = {
   proposedPlace: true,
   proposedPlaceNote: true,
   chosenTime: { select: { startsAt: true } },
-  chosenPlace: { select: { name: true, note: true } },
+  proposedPhotoUrl: true,
+  chosenPlace: { select: { name: true, note: true, photoUrl: true } },
 } satisfies Prisma.ResponseSelect;
 
 export const TURN_OPTIONS_SELECT = {
@@ -45,7 +53,7 @@ export const TURN_OPTIONS_SELECT = {
     orderBy: { startsAt: "asc" },
   },
   turnPlaces: {
-    select: { id: true, name: true, note: true },
+    select: { id: true, name: true, note: true, photoUrl: true },
     orderBy: { id: "asc" },
   },
 } satisfies Prisma.InviteSelect;
@@ -83,6 +91,7 @@ export function toSentAnswer(
   const proposedBy = toProposer(lastProposedBy);
   const outcome = getOutcome(response.type, status, proposedBy);
 
+  // No "idea" note for moves: after a few moves it is unclear whose idea it was.
   const turnTimes = turn?.turnTimes ?? [];
   const turnPlaces = turn?.turnPlaces ?? [];
   if (turnTimes.length > 0 && turnPlaces.length > 0) {
@@ -95,6 +104,7 @@ export function toSentAnswer(
       time: onlyTime ? onlyTime.startsAt.toISOString() : null,
       place: onlyPlace?.name ?? null,
       placeNote: onlyPlace?.note ?? null,
+      placePhoto: onlyPlace?.photoUrl ?? null,
       isOwnTime: false,
       isOwnPlace: false,
       choices: hasChoice
@@ -109,6 +119,7 @@ export function toSentAnswer(
     };
   }
 
+  // An own value wins over a picked option, as when saving.
   const time = response.proposedTime ?? response.chosenTime?.startsAt;
   const place = response.proposedPlace ?? response.chosenPlace?.name;
 
@@ -120,6 +131,9 @@ export function toSentAnswer(
     placeNote: response.proposedPlace
       ? response.proposedPlaceNote
       : (response.chosenPlace?.note ?? null),
+    placePhoto: response.proposedPlace
+      ? response.proposedPhotoUrl
+      : (response.chosenPlace?.photoUrl ?? null),
     isOwnTime: response.proposedTime !== null,
     isOwnPlace: response.proposedPlace !== null,
     choices: null,
@@ -128,7 +142,7 @@ export function toSentAnswer(
 
 export type LastWords = { by: Proposer; text: string };
 
-// Before any move: the guest's words from the first answer. After a move only that move's words count, even if empty.
+// Before any move: the guest's first words; after a move only that move's words, even if empty.
 export function getLastWords(
   lastMessageBy: Party | null,
   turnMessage: string | null,
